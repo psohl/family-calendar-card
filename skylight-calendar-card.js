@@ -10,6 +10,7 @@ class SkylightCalendarCard extends HTMLElement {
     this._fetching = false;
     this._lastFetch = null;
     this._hiddenCalendars = new Set(); // Track which calendars are hidden
+    this._calendarCapabilities = {}; // Track calendar capabilities
   }
 
   setConfig(config) {
@@ -34,6 +35,8 @@ class SkylightCalendarCard extends HTMLElement {
       height_scale: config.height_scale || 1.0, // Scale factor for height (0.5 = 50%, 2.0 = 200%)
       compact_header: config.compact_header || false, // Compact header layout
       header_color: config.header_color !== undefined ? config.header_color : 'var(--primary-color)', // Custom header background color/gradient
+      enable_event_management: config.enable_event_management !== false, // Enable create/edit/delete
+      readonly_calendars: config.readonly_calendars || [], // Calendars that should not allow modifications
       ...config
     };
     this._viewMode = this._config.default_view;
@@ -45,10 +48,45 @@ class SkylightCalendarCard extends HTMLElement {
     const oldHass = this._hass;
     this._hass = hass;
     
+    // Check calendar capabilities when hass is set
+    if (!oldHass || this._hass !== oldHass) {
+      this.checkAllCalendarCapabilities();
+    }
+    
     // Only fetch events if this is the first time or entities changed
     if (!oldHass || !this._lastFetch || Date.now() - this._lastFetch > 60000) {
       this.updateEvents();
     }
+  }
+
+  async checkAllCalendarCapabilities() {
+    if (!this._hass) return;
+    
+    for (const entityId of this._config.entities) {
+      const entity = this._hass.states[entityId];
+      if (entity) {
+        const features = entity.attributes?.supported_features || 0;
+        
+        // Check if this is a Google Calendar (which doesn't support UPDATE/DELETE services)
+        const isGoogleCalendar = entityId.includes('google') || 
+                                 entity.attributes?.integration === 'google';
+        
+        this._calendarCapabilities[entityId] = {
+          canCreate: true, // Most calendars support creation
+          canUpdate: (features & 2) !== 0, // UPDATE_EVENT = 2
+          canDelete: (features & 4) !== 0, // DELETE_EVENT = 4
+          isReadonly: this._config.readonly_calendars.includes(entityId),
+          isGoogleCalendar: isGoogleCalendar // Track Google Calendar separately
+        };
+      }
+    }
+  }
+
+  getWritableCalendars() {
+    return this._config.entities.filter(entityId => {
+      const caps = this._calendarCapabilities[entityId];
+      return caps && caps.canCreate && !caps.isReadonly;
+    });
   }
 
   async updateEvents() {
@@ -90,8 +128,8 @@ class SkylightCalendarCard extends HTMLElement {
           });
         }
       } catch (error) {
-        console.error(`Failed to fetch events for ${entityId}:`, error);
-        console.log('Trying alternative method...');
+        // WebSocket API might not be available in older HA versions or for some integrations
+        // Try REST API fallback without logging (this is expected)
         
         // Fallback: try the REST API
         try {
@@ -109,7 +147,8 @@ class SkylightCalendarCard extends HTMLElement {
             });
           }
         } catch (error2) {
-          console.error(`Alternative method also failed for ${entityId}:`, error2);
+          // Both methods failed - this is a real error
+          console.error(`Failed to fetch events for ${entityId}:`, error2.message || error2);
         }
       }
     }
@@ -196,6 +235,12 @@ class SkylightCalendarCard extends HTMLElement {
         padding: 16px 24px;
       }
       
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      
       .compact-header-left {
         display: flex;
         align-items: center;
@@ -228,6 +273,36 @@ class SkylightCalendarCard extends HTMLElement {
         font-size: 24px;
         font-weight: 600;
         margin: 0;
+      }
+      
+      .add-event-button {
+        background: rgba(255, 255, 255, 0.25);
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        color: white;
+        padding: 8px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+      }
+      
+      .add-event-button:hover {
+        background: rgba(255, 255, 255, 0.35);
+        border-color: rgba(255, 255, 255, 0.6);
+        transform: translateY(-1px);
+      }
+      
+      .add-event-button:active {
+        transform: translateY(0);
+      }
+      
+      .add-event-button .icon {
+        font-size: 18px;
+        font-weight: bold;
       }
       
       .header-controls {
@@ -669,6 +744,12 @@ class SkylightCalendarCard extends HTMLElement {
         border-top: 1px solid #f3f4f6;
         position: relative;
         box-sizing: border-box;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      
+      .day-time-slot:hover {
+        background: rgba(59, 130, 246, 0.05);
       }
       
       .week-standard-event {
@@ -805,6 +886,285 @@ class SkylightCalendarCard extends HTMLElement {
         flex: 1;
       }
       
+      .form-group {
+        margin-bottom: 20px;
+      }
+      
+      .form-label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 8px;
+      }
+      
+      .form-required {
+        color: #ef4444;
+        margin-left: 4px;
+      }
+      
+      .form-input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: inherit;
+        transition: border-color 0.2s;
+        box-sizing: border-box;
+      }
+      
+      .form-input:focus {
+        outline: none;
+        border-color: #3b82f6;
+      }
+      
+      .form-input.error {
+        border-color: #ef4444;
+      }
+      
+      .form-select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: inherit;
+        background: white;
+        cursor: pointer;
+        transition: border-color 0.2s;
+        box-sizing: border-box;
+      }
+      
+      .form-select:focus {
+        outline: none;
+        border-color: #3b82f6;
+      }
+      
+      .form-textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: inherit;
+        min-height: 80px;
+        resize: vertical;
+        transition: border-color 0.2s;
+        box-sizing: border-box;
+      }
+      
+      .form-textarea:focus {
+        outline: none;
+        border-color: #3b82f6;
+      }
+      
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      
+      .form-checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .form-checkbox {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+      }
+      
+      .form-checkbox-label {
+        font-size: 14px;
+        color: #374151;
+        cursor: pointer;
+        user-select: none;
+      }
+      
+      .form-error {
+        color: #ef4444;
+        font-size: 13px;
+        margin-top: 4px;
+      }
+      
+      .form-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 24px;
+      }
+      
+      .btn {
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+        font-family: inherit;
+      }
+      
+      .btn-primary {
+        background: #3b82f6;
+        color: white;
+      }
+      
+      .btn-primary:hover {
+        background: #2563eb;
+        transform: translateY(-1px);
+      }
+      
+      .btn-primary:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+      }
+      
+      .btn-secondary {
+        background: #f3f4f6;
+        color: #374151;
+      }
+      
+      .btn-secondary:hover {
+        background: #e5e7eb;
+      }
+      
+      .btn-danger {
+        background: #ef4444;
+        color: white;
+      }
+      
+      .btn-danger:hover {
+        background: #dc2626;
+        transform: translateY(-1px);
+      }
+      
+      .btn-danger:disabled {
+        background: #fca5a5;
+        cursor: not-allowed;
+        transform: none;
+      }
+      
+      .modal-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+        margin-top: 24px;
+        align-items: center;
+      }
+      
+      .modal-actions-left {
+        display: flex;
+        gap: 12px;
+      }
+      
+      .modal-actions-right {
+        display: flex;
+        gap: 12px;
+      }
+      
+      .confirm-dialog {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+      }
+      
+      .confirm-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #111827;
+        margin: 0 0 12px 0;
+      }
+      
+      .confirm-message {
+        font-size: 14px;
+        color: #6b7280;
+        margin-bottom: 20px;
+        line-height: 1.5;
+      }
+      
+      .confirm-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+      }
+      
+      .recurring-options {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      
+      .recurring-option {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        cursor: pointer;
+        border-radius: 6px;
+        transition: background 0.2s;
+        margin-bottom: 8px;
+      }
+      
+      .recurring-option:hover {
+        background: #f3f4f6;
+      }
+      
+      .recurring-option:last-child {
+        margin-bottom: 0;
+      }
+      
+      .recurring-option input[type="radio"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+      }
+      
+      .recurring-option-label {
+        flex: 1;
+      }
+      
+      .recurring-option-title {
+        font-weight: 600;
+        color: #111827;
+        font-size: 14px;
+        margin-bottom: 2px;
+      }
+      
+      .recurring-option-description {
+        font-size: 13px;
+        color: #6b7280;
+      }
+      
+      .error-message {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        font-size: 14px;
+      }
+      
+      .success-message {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #166534;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        font-size: 14px;
+      }
+      
       .empty-state {
         padding: 40px 24px;
         text-align: center;
@@ -849,6 +1209,10 @@ class SkylightCalendarCard extends HTMLElement {
         .week-standard-day-date {
           font-size: 14px;
         }
+        
+        .form-row {
+          grid-template-columns: 1fr;
+        }
       }
     `;
   }
@@ -883,9 +1247,15 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   renderStandardHeader() {
+    const writableCalendars = this.getWritableCalendars();
+    const canAddEvents = this._config.enable_event_management && writableCalendars.length > 0;
+    
     return `
       <div class="header">
-        <h2 class="header-title">${this._config.title}</h2>
+        <div class="header-left">
+          <h2 class="header-title">${this._config.title}</h2>
+          ${canAddEvents ? '<button class="add-event-button" id="add-event-btn"><span class="icon">+</span>Add Event</button>' : ''}
+        </div>
         <div class="header-controls">
           ${this.renderViewModeButtons()}
           <button class="nav-button" id="prev-period">‹</button>
@@ -898,11 +1268,15 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   renderCompactHeader() {
+    const writableCalendars = this.getWritableCalendars();
+    const canAddEvents = this._config.enable_event_management && writableCalendars.length > 0;
+    
     return `
       <div class="header header-compact">
         <div class="compact-header-left">
           <h2 class="header-title">${this._config.title}</h2>
           ${this.renderCalendarBadgesInline()}
+          ${canAddEvents ? '<button class="add-event-button" id="add-event-btn"><span class="icon">+</span>Add Event</button>' : ''}
         </div>
         <div class="header-controls">
           ${this.renderViewModeButtons()}
@@ -1024,7 +1398,7 @@ class SkylightCalendarCard extends HTMLElement {
           const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
           
           return `
-            <div class="week-day-column ${isToday ? 'today' : ''}">
+            <div class="week-day-column ${isToday ? 'today' : ''}" data-date="${date.toISOString()}" data-click-target="day-header">
               <div class="week-day-header">
                 <div class="week-day-name">${dayNames[date.getDay()]}</div>
                 <div class="week-day-date">${date.getDate()}</div>
@@ -1095,8 +1469,6 @@ class SkylightCalendarCard extends HTMLElement {
     });
     
     const hasAllDayEvents = maxAllDayEvents > 0;
-    // Calculate height: 16px padding + events×24px + gaps×4px + 2px border
-    // gaps = events - 1 (no gap after last event)
     const allDayHeight = hasAllDayEvents 
       ? 16 + (maxAllDayEvents * 24) + ((maxAllDayEvents - 1) * 4) + 2
       : 0;
@@ -1122,15 +1494,15 @@ class SkylightCalendarCard extends HTMLElement {
           const dayEvents = this.getEventsForDay(date);
           
           return `
-            <div class="week-standard-day-column ${isToday ? 'today' : ''}">
-              <div class="week-standard-day-header">
+            <div class="week-standard-day-column ${isToday ? 'today' : ''}" data-date="${date.toISOString()}">
+              <div class="week-standard-day-header" data-click-target="day-header">
                 <div class="week-standard-day-name">${dayNames[date.getDay()]}</div>
                 <div class="week-standard-day-date">${date.getDate()}</div>
               </div>
               ${hasAllDayEvents ? this.renderAllDayEventsForDay(dayEvents, allDayHeight) : ''}
               <div class="day-time-slots">
                 ${hours.map(hour => `
-                  <div class="day-time-slot" style="height: ${hourHeight}px;"></div>
+                  <div class="day-time-slot" style="height: ${hourHeight}px;" data-hour="${hour}"></div>
                 `).join('')}
                 ${this.renderTimedEventsForDay(dayEvents, date, startHour, endHour, hourHeight)}
               </div>
@@ -1186,7 +1558,6 @@ class SkylightCalendarCard extends HTMLElement {
       return isAllDay;
     });
     
-    // Always render with the calculated height to keep all days aligned
     return `
       <div class="all-day-events" style="min-height: ${allDayHeight}px; height: ${allDayHeight}px;">
         ${allDayEvents.length > 0 ? allDayEvents.map(event => {
@@ -1310,12 +1681,6 @@ class SkylightCalendarCard extends HTMLElement {
         </div>
       `;
     }).join('');
-  }
-
-  renderWeekStandardEvents(events, date, startHour, endHour) {
-    // This method is kept for backwards compatibility but now calls the split methods
-    const hourHeight = 120 * (this._config.height_scale || 1.0);
-    return this.renderTimedEventsForDay(events, date, startHour, endHour, hourHeight);
   }
 
   renderEventIcon(event) {
@@ -1493,6 +1858,7 @@ class SkylightCalendarCard extends HTMLElement {
     const prevButton = this.shadowRoot.getElementById('prev-period');
     const nextButton = this.shadowRoot.getElementById('next-period');
     const todayButton = this.shadowRoot.getElementById('today');
+    const addEventButton = this.shadowRoot.getElementById('add-event-btn');
     const modal = this.shadowRoot.getElementById('event-modal');
     
     // View mode buttons
@@ -1516,6 +1882,11 @@ class SkylightCalendarCard extends HTMLElement {
         }
         this.render();
       });
+    });
+    
+    // Add event button
+    addEventButton?.addEventListener('click', () => {
+      this.showCreateEventModal();
     });
     
     prevButton?.addEventListener('click', () => {
@@ -1572,12 +1943,57 @@ class SkylightCalendarCard extends HTMLElement {
     
     // Day click handlers (month view only)
     this.shadowRoot.querySelectorAll('.day-cell').forEach(dayEl => {
-      dayEl.addEventListener('click', () => {
-        const date = new Date(dayEl.getAttribute('data-date'));
-        const events = this.getEventsForDay(date);
-        if (events.length > 0) {
-          this.showDayModal(date, events);
+      dayEl.addEventListener('click', (e) => {
+        // Don't open if clicking on an event
+        if (e.target.classList.contains('event') || e.target.closest('.event')) {
+          return;
         }
+        
+        const date = new Date(dayEl.getAttribute('data-date'));
+        
+        // If event management is enabled, show create modal
+        if (this._config.enable_event_management && this.getWritableCalendars().length > 0) {
+          this.showCreateEventModal(date);
+        } else {
+          // Otherwise show events for that day
+          const events = this.getEventsForDay(date);
+          if (events.length > 0) {
+            this.showDayModal(date, events);
+          }
+        }
+      });
+    });
+    
+    // Time slot click handlers (schedule view)
+    this.shadowRoot.querySelectorAll('.day-time-slot').forEach(slotEl => {
+      slotEl.addEventListener('click', (e) => {
+        if (!this._config.enable_event_management || this.getWritableCalendars().length === 0) {
+          return;
+        }
+        
+        // Get the date and hour from the parent column
+        const column = slotEl.closest('.week-standard-day-column');
+        const date = new Date(column.getAttribute('data-date'));
+        const hour = parseInt(slotEl.getAttribute('data-hour'));
+        
+        // Set the time on the date
+        date.setHours(hour, 0, 0, 0);
+        
+        this.showCreateEventModal(date);
+      });
+    });
+    
+    // Day header click handlers (week views)
+    this.shadowRoot.querySelectorAll('[data-click-target="day-header"]').forEach(headerEl => {
+      headerEl.addEventListener('click', (e) => {
+        if (!this._config.enable_event_management || this.getWritableCalendars().length === 0) {
+          return;
+        }
+        
+        const column = headerEl.closest('[data-date]');
+        const date = new Date(column.getAttribute('data-date'));
+        
+        this.showCreateEventModal(date);
       });
     });
     
@@ -1587,6 +2003,789 @@ class SkylightCalendarCard extends HTMLElement {
         modal.classList.remove('show');
       }
     });
+  }
+
+  showCreateEventModal(defaultDate = null, defaultTime = null) {
+    const modal = this.shadowRoot.getElementById('event-modal');
+    const content = this.shadowRoot.getElementById('modal-content');
+    
+    const writableCalendars = this.getWritableCalendars();
+    if (writableCalendars.length === 0) {
+      this.showError('No writable calendars available');
+      return;
+    }
+    
+    // Set defaults
+    const now = new Date();
+    const startDate = defaultDate || now;
+    const startTime = defaultTime || startDate;
+    
+    // Round to next half hour for timed events
+    if (!defaultDate || defaultDate.getHours() !== 0) {
+      const minutes = startTime.getMinutes();
+      if (minutes < 30) {
+        startTime.setMinutes(30);
+      } else {
+        startTime.setHours(startTime.getHours() + 1);
+        startTime.setMinutes(0);
+      }
+    }
+    startTime.setSeconds(0);
+    startTime.setMilliseconds(0);
+    
+    // End time is 1 hour after start (for timed events)
+    const endTime = new Date(startTime);
+    endTime.setHours(endTime.getHours() + 1);
+    
+    // For all-day events, show same day to user (we'll add +1 when submitting)
+    const endDate = new Date(startDate);
+    
+    // Format for datetime-local input
+    const formatDateTimeLocal = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+    
+    const formatDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    content.innerHTML = `
+      <div class="modal-header">
+        <h3 class="modal-title">Create Event</h3>
+        <button class="modal-close" id="close-modal">×</button>
+      </div>
+      <div class="modal-body">
+        <form id="create-event-form">
+          <div class="form-group">
+            <label class="form-label">
+              Calendar<span class="form-required">*</span>
+            </label>
+            <select class="form-select" id="event-calendar" required>
+              ${writableCalendars.map((entityId, index) => `
+                <option value="${entityId}" ${index === 0 ? 'selected' : ''}>
+                  ${this.escapeHtml(this.getCalendarName(entityId))}
+                </option>
+              `).join('')}
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">
+              Event Title<span class="form-required">*</span>
+            </label>
+            <input type="text" class="form-input" id="event-title" placeholder="Team Meeting" required />
+          </div>
+          
+          <div class="form-group">
+            <div class="form-checkbox-group">
+              <input type="checkbox" class="form-checkbox" id="event-all-day" />
+              <label class="form-checkbox-label" for="event-all-day">All-day event</label>
+            </div>
+          </div>
+          
+          <div id="timed-event-fields">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Start</label>
+                <input type="datetime-local" class="form-input" id="event-start" 
+                       value="${formatDateTimeLocal(startTime)}" required />
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">End</label>
+                <input type="datetime-local" class="form-input" id="event-end" 
+                       value="${formatDateTimeLocal(endTime)}" required />
+              </div>
+            </div>
+          </div>
+          
+          <div id="all-day-event-fields" style="display: none;">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Start Date</label>
+                <input type="date" class="form-input" id="event-start-date" 
+                       value="${formatDate(startDate)}" />
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">End Date</label>
+                <input type="date" class="form-input" id="event-end-date" 
+                       value="${formatDate(endDate)}" />
+              </div>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Location</label>
+            <input type="text" class="form-input" id="event-location" placeholder="Conference Room A" />
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea class="form-textarea" id="event-description" placeholder="Event details..."></textarea>
+          </div>
+          
+          <div id="form-error" class="error-message" style="display: none;"></div>
+          
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="submit-btn">Create Event</button>
+          </div>
+        </form>
+      </div>
+    `;
+    
+    modal.classList.add('show');
+    
+    // Event listeners
+    const form = this.shadowRoot.getElementById('create-event-form');
+    const allDayCheckbox = this.shadowRoot.getElementById('event-all-day');
+    const timedFields = this.shadowRoot.getElementById('timed-event-fields');
+    const allDayFields = this.shadowRoot.getElementById('all-day-event-fields');
+    const errorDiv = this.shadowRoot.getElementById('form-error');
+    
+    // Toggle all-day fields
+    allDayCheckbox.addEventListener('change', () => {
+      if (allDayCheckbox.checked) {
+        timedFields.style.display = 'none';
+        allDayFields.style.display = 'block';
+      } else {
+        timedFields.style.display = 'block';
+        allDayFields.style.display = 'none';
+      }
+    });
+    
+    // Close button
+    this.shadowRoot.getElementById('close-modal').addEventListener('click', () => {
+      modal.classList.remove('show');
+    });
+    
+    // Cancel button
+    this.shadowRoot.getElementById('cancel-btn').addEventListener('click', () => {
+      modal.classList.remove('show');
+    });
+    
+    // Form submission
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const calendarId = this.shadowRoot.getElementById('event-calendar').value;
+      const title = this.shadowRoot.getElementById('event-title').value.trim();
+      const isAllDay = this.shadowRoot.getElementById('event-all-day').checked;
+      const location = this.shadowRoot.getElementById('event-location').value.trim();
+      const description = this.shadowRoot.getElementById('event-description').value.trim();
+      
+      if (!title) {
+        this.showFormError(errorDiv, 'Event title is required');
+        return;
+      }
+      
+      let eventData = {
+        summary: title,
+        location: location || undefined,
+        description: description || undefined
+      };
+      
+      if (isAllDay) {
+        const startDate = this.shadowRoot.getElementById('event-start-date').value;
+        const endDate = this.shadowRoot.getElementById('event-end-date').value;
+        
+        if (!startDate || !endDate) {
+          this.showFormError(errorDiv, 'Start and end dates are required');
+          return;
+        }
+        
+        // Validate that end date is on or after start date
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        if (end < start) {
+          this.showFormError(errorDiv, 'End date cannot be before start date');
+          return;
+        }
+        
+        // For Home Assistant, end date is exclusive, so add 1 day
+        const exclusiveEndDate = new Date(end);
+        exclusiveEndDate.setDate(exclusiveEndDate.getDate() + 1);
+        const exclusiveEndDateStr = exclusiveEndDate.toISOString().split('T')[0];
+        
+        eventData.start = { date: startDate };
+        eventData.end = { date: exclusiveEndDateStr };
+      } else {
+        const startDateTime = this.shadowRoot.getElementById('event-start').value;
+        const endDateTime = this.shadowRoot.getElementById('event-end').value;
+        
+        if (!startDateTime || !endDateTime) {
+          this.showFormError(errorDiv, 'Start and end times are required');
+          return;
+        }
+        
+        // Convert to ISO format
+        const start = new Date(startDateTime);
+        const end = new Date(endDateTime);
+        
+        if (end <= start) {
+          this.showFormError(errorDiv, 'End time must be after start time');
+          return;
+        }
+        
+        eventData.start = { dateTime: start.toISOString() };
+        eventData.end = { dateTime: end.toISOString() };
+      }
+      
+      // Disable submit button
+      const submitBtn = this.shadowRoot.getElementById('submit-btn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Creating...';
+      
+      try {
+        await this.createEvent(calendarId, eventData);
+        modal.classList.remove('show');
+        
+        // Refresh events
+        this._lastFetch = null;
+        await this.updateEvents();
+      } catch (error) {
+        console.error('Failed to create event:', error);
+        this.showFormError(errorDiv, error.message || 'Failed to create event. Please try again.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Event';
+      }
+    });
+    
+    // Focus on title input
+    setTimeout(() => {
+      this.shadowRoot.getElementById('event-title')?.focus();
+    }, 100);
+  }
+
+  showEditEventModal(event, startDate, endDate, isAllDay) {
+    const modal = this.shadowRoot.getElementById('event-modal');
+    const content = this.shadowRoot.getElementById('modal-content');
+    
+    const writableCalendars = this.getWritableCalendars();
+    if (writableCalendars.length === 0) {
+      this.showError('No writable calendars available');
+      return;
+    }
+    
+    // Format for datetime-local input
+    const formatDateTimeLocal = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+    
+    const formatDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    content.innerHTML = `
+      <div class="modal-header">
+        <h3 class="modal-title">Edit Event</h3>
+        <button class="modal-close" id="close-modal">×</button>
+      </div>
+      <div class="modal-body">
+        <form id="edit-event-form">
+          <div class="form-group">
+            <label class="form-label">
+              Calendar<span class="form-required">*</span>
+            </label>
+            <select class="form-select" id="event-calendar" required>
+              ${writableCalendars.map((entityId) => `
+                <option value="${entityId}" ${entityId === event.entityId ? 'selected' : ''}>
+                  ${this.escapeHtml(this.getCalendarName(entityId))}
+                </option>
+              `).join('')}
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">
+              Event Title<span class="form-required">*</span>
+            </label>
+            <input type="text" class="form-input" id="event-title" 
+                   placeholder="Team Meeting" 
+                   value="${this.escapeHtml(event.summary || '')}" required />
+          </div>
+          
+          <div class="form-group">
+            <div class="form-checkbox-group">
+              <input type="checkbox" class="form-checkbox" id="event-all-day" ${isAllDay ? 'checked' : ''} />
+              <label class="form-checkbox-label" for="event-all-day">All-day event</label>
+            </div>
+          </div>
+          
+          <div id="timed-event-fields" style="display: ${isAllDay ? 'none' : 'block'};">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Start</label>
+                <input type="datetime-local" class="form-input" id="event-start" 
+                       value="${formatDateTimeLocal(startDate)}" required />
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">End</label>
+                <input type="datetime-local" class="form-input" id="event-end" 
+                       value="${formatDateTimeLocal(endDate)}" required />
+              </div>
+            </div>
+          </div>
+          
+          <div id="all-day-event-fields" style="display: ${isAllDay ? 'block' : 'none'};">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Start Date</label>
+                <input type="date" class="form-input" id="event-start-date" 
+                       value="${formatDate(startDate)}" />
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">End Date</label>
+                <input type="date" class="form-input" id="event-end-date" 
+                       value="${formatDate(endDate)}" />
+              </div>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Location</label>
+            <input type="text" class="form-input" id="event-location" 
+                   placeholder="Conference Room A" 
+                   value="${this.escapeHtml(event.location || '')}" />
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea class="form-textarea" id="event-description" placeholder="Event details...">${this.escapeHtml(event.description || '')}</textarea>
+          </div>
+          
+          <div id="form-error" class="error-message" style="display: none;"></div>
+          
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="submit-btn">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    `;
+    
+    modal.classList.add('show');
+    
+    // Event listeners
+    const form = this.shadowRoot.getElementById('edit-event-form');
+    const allDayCheckbox = this.shadowRoot.getElementById('event-all-day');
+    const timedFields = this.shadowRoot.getElementById('timed-event-fields');
+    const allDayFields = this.shadowRoot.getElementById('all-day-event-fields');
+    const errorDiv = this.shadowRoot.getElementById('form-error');
+    
+    // Toggle all-day fields
+    allDayCheckbox.addEventListener('change', () => {
+      if (allDayCheckbox.checked) {
+        timedFields.style.display = 'none';
+        allDayFields.style.display = 'block';
+      } else {
+        timedFields.style.display = 'block';
+        allDayFields.style.display = 'none';
+      }
+    });
+    
+    // Close button
+    this.shadowRoot.getElementById('close-modal').addEventListener('click', () => {
+      modal.classList.remove('show');
+    });
+    
+    // Cancel button
+    this.shadowRoot.getElementById('cancel-btn').addEventListener('click', () => {
+      modal.classList.remove('show');
+    });
+    
+    // Form submission
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const calendarId = this.shadowRoot.getElementById('event-calendar').value;
+      const title = this.shadowRoot.getElementById('event-title').value.trim();
+      const isAllDayChecked = this.shadowRoot.getElementById('event-all-day').checked;
+      const location = this.shadowRoot.getElementById('event-location').value.trim();
+      const description = this.shadowRoot.getElementById('event-description').value.trim();
+      
+      if (!title) {
+        this.showFormError(errorDiv, 'Event title is required');
+        return;
+      }
+      
+      let eventData = {
+        summary: title,
+        location: location || undefined,
+        description: description || undefined
+      };
+      
+      if (isAllDayChecked) {
+        const startDateStr = this.shadowRoot.getElementById('event-start-date').value;
+        const endDateStr = this.shadowRoot.getElementById('event-end-date').value;
+        
+        if (!startDateStr || !endDateStr) {
+          this.showFormError(errorDiv, 'Start and end dates are required');
+          return;
+        }
+        
+        // Validate that end date is on or after start date
+        const start = new Date(startDateStr);
+        const end = new Date(endDateStr);
+        
+        if (end < start) {
+          this.showFormError(errorDiv, 'End date cannot be before start date');
+          return;
+        }
+        
+        // For Home Assistant, end date is exclusive, so add 1 day
+        const exclusiveEndDate = new Date(end);
+        exclusiveEndDate.setDate(exclusiveEndDate.getDate() + 1);
+        const exclusiveEndDateStr = exclusiveEndDate.toISOString().split('T')[0];
+        
+        eventData.start = { date: startDateStr };
+        eventData.end = { date: exclusiveEndDateStr };
+      } else {
+        const startDateTime = this.shadowRoot.getElementById('event-start').value;
+        const endDateTime = this.shadowRoot.getElementById('event-end').value;
+        
+        if (!startDateTime || !endDateTime) {
+          this.showFormError(errorDiv, 'Start and end times are required');
+          return;
+        }
+        
+        // Convert to ISO format
+        const start = new Date(startDateTime);
+        const end = new Date(endDateTime);
+        
+        if (end <= start) {
+          this.showFormError(errorDiv, 'End time must be after start time');
+          return;
+        }
+        
+        eventData.start = { dateTime: start.toISOString() };
+        eventData.end = { dateTime: end.toISOString() };
+      }
+      
+      // Disable submit button
+      const submitBtn = this.shadowRoot.getElementById('submit-btn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
+      
+      try {
+        await this.updateEvent(event, calendarId, eventData);
+        modal.classList.remove('show');
+        
+        // Refresh events
+        this._lastFetch = null;
+        await this.updateEvents();
+      } catch (error) {
+        console.error('Failed to update event:', error);
+        this.showFormError(errorDiv, error.message || 'Failed to update event. Please try again.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Changes';
+      }
+    });
+    
+    // Focus on title input
+    setTimeout(() => {
+      this.shadowRoot.getElementById('event-title')?.focus();
+    }, 100);
+  }
+
+  async updateEvent(originalEvent, newCalendarId, eventData) {
+    if (!this._hass) {
+      throw new Error('Home Assistant not available');
+    }
+    
+    const capabilities = this._calendarCapabilities[originalEvent.entityId] || {};
+    
+    // Check if we're moving to a different calendar
+    const movingCalendar = newCalendarId !== originalEvent.entityId;
+    
+    // Google Calendar and other calendars without UID support can't be edited
+    if (capabilities.isGoogleCalendar) {
+      throw new Error('Google Calendar does not support editing events through Home Assistant. Please use the Google Calendar app or website.');
+    }
+    
+    if (!originalEvent.uid) {
+      throw new Error('This event is missing required information (UID) and cannot be edited.');
+    }
+    
+    // If calendar supports UPDATE and we're not moving calendars, use update service
+    if (capabilities.canUpdate && !movingCalendar) {
+      try {
+        const serviceData = {
+          entity_id: originalEvent.entityId,
+          uid: originalEvent.uid,
+          summary: eventData.summary
+        };
+        
+        // Add location if provided
+        if (eventData.location) {
+          serviceData.location = eventData.location;
+        }
+        
+        // Add description if provided
+        if (eventData.description) {
+          serviceData.description = eventData.description;
+        }
+        
+        // Add date/time fields
+        if (eventData.start.date) {
+          serviceData.start_date = eventData.start.date;
+          serviceData.end_date = eventData.end.date;
+        } else {
+          serviceData.start_date_time = eventData.start.dateTime;
+          serviceData.end_date_time = eventData.end.dateTime;
+        }
+        
+        // Add recurrence_id if this is a recurring event instance
+        if (originalEvent.recurrence_id) {
+          serviceData.recurrence_id = originalEvent.recurrence_id;
+        }
+        
+        await this._hass.callService('calendar', 'update_event', serviceData);
+        return;
+      } catch (error) {
+        console.error('Update service failed, trying delete+create fallback:', error.message);
+        // Fall through to delete+create pattern
+      }
+    }
+    
+    // Fallback: Delete old event and create new one
+    // This works even when moving between calendars or when UPDATE is not supported
+    if (!capabilities.canDelete) {
+      throw new Error('This calendar does not support event modifications. Try creating a new event instead.');
+    }
+    
+    try {
+      // Delete from original calendar
+      await this.deleteEvent(originalEvent.entityId, originalEvent.uid, originalEvent.recurrence_id);
+      
+      // Create in new calendar (might be same or different)
+      await this.createEvent(newCalendarId, eventData);
+    } catch (error) {
+      console.error('Delete+Create fallback failed:', error);
+      throw new Error(error.message || 'Failed to update event. The calendar may not support modifications.');
+    }
+  }
+
+  async deleteEvent(calendarId, uid, recurrenceId = null, recurrenceRange = null) {
+    if (!this._hass) {
+      throw new Error('Home Assistant not available');
+    }
+    
+    const serviceData = {
+      entity_id: calendarId,
+      uid: uid
+    };
+    
+    // Add recurrence_id if deleting a specific instance
+    if (recurrenceId) {
+      serviceData.recurrence_id = recurrenceId;
+    }
+    
+    // Add recurrence_range if deleting this and future events
+    if (recurrenceRange) {
+      serviceData.recurrence_range = recurrenceRange;
+    }
+    
+    try {
+      await this._hass.callService('calendar', 'delete_event', serviceData);
+    } catch (error) {
+      console.error('Delete service call failed:', error);
+      throw new Error(error.message || 'Failed to delete event');
+    }
+  }
+
+  async createEvent(calendarId, eventData) {
+    if (!this._hass) {
+      throw new Error('Home Assistant not available');
+    }
+    
+    // Build service data based on event type
+    const serviceData = {
+      entity_id: calendarId,
+      summary: eventData.summary
+    };
+    
+    // Add location if provided
+    if (eventData.location) {
+      serviceData.location = eventData.location;
+    }
+    
+    // Add description if provided
+    if (eventData.description) {
+      serviceData.description = eventData.description;
+    }
+    
+    // Add date/time fields
+    if (eventData.start.date) {
+      // All-day event
+      serviceData.start_date = eventData.start.date;
+      serviceData.end_date = eventData.end.date;
+    } else {
+      // Timed event
+      serviceData.start_date_time = eventData.start.dateTime;
+      serviceData.end_date_time = eventData.end.dateTime;
+    }
+    
+    try {
+      await this._hass.callService('calendar', 'create_event', serviceData);
+    } catch (error) {
+      console.error('Service call failed:', error);
+      throw new Error(error.message || 'Failed to create event');
+    }
+  }
+
+  showFormError(errorDiv, message) {
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+    setTimeout(() => {
+      errorDiv.style.display = 'none';
+    }, 5000);
+  }
+
+  showDeleteConfirmation(event) {
+    const modal = this.shadowRoot.getElementById('event-modal');
+    const content = this.shadowRoot.getElementById('modal-content');
+    
+    // Check if this is a recurring event
+    const isRecurring = event.rrule || event.recurrence_id;
+    
+    if (isRecurring) {
+      // Show recurring event deletion options
+      content.innerHTML = `
+        <div class="confirm-dialog">
+          <h3 class="confirm-title">Delete Recurring Event</h3>
+          <p class="confirm-message">
+            "${this.escapeHtml(event.summary || 'Untitled Event')}" is a recurring event. How would you like to delete it?
+          </p>
+          
+          <div class="recurring-options">
+            <label class="recurring-option">
+              <input type="radio" name="delete-option" value="this" checked />
+              <div class="recurring-option-label">
+                <div class="recurring-option-title">This event only</div>
+                <div class="recurring-option-description">Delete just this occurrence</div>
+              </div>
+            </label>
+            
+            ${event.recurrence_id ? `
+              <label class="recurring-option">
+                <input type="radio" name="delete-option" value="future" />
+                <div class="recurring-option-label">
+                  <div class="recurring-option-title">This and future events</div>
+                  <div class="recurring-option-description">Delete this occurrence and all future occurrences</div>
+                </div>
+              </label>
+            ` : ''}
+            
+            <label class="recurring-option">
+              <input type="radio" name="delete-option" value="all" />
+              <div class="recurring-option-label">
+                <div class="recurring-option-title">All events</div>
+                <div class="recurring-option-description">Delete the entire recurring series</div>
+              </div>
+            </label>
+          </div>
+          
+          <div class="confirm-actions">
+            <button class="btn btn-secondary" id="cancel-delete-btn">Cancel</button>
+            <button class="btn btn-danger" id="confirm-delete-btn">Delete</button>
+          </div>
+        </div>
+      `;
+    } else {
+      // Show simple confirmation for non-recurring events
+      content.innerHTML = `
+        <div class="confirm-dialog">
+          <h3 class="confirm-title">Delete Event</h3>
+          <p class="confirm-message">
+            Are you sure you want to delete "${this.escapeHtml(event.summary || 'Untitled Event')}"? This action cannot be undone.
+          </p>
+          <div class="confirm-actions">
+            <button class="btn btn-secondary" id="cancel-delete-btn">Cancel</button>
+            <button class="btn btn-danger" id="confirm-delete-btn">Delete</button>
+          </div>
+        </div>
+      `;
+    }
+    
+    modal.classList.add('show');
+    
+    // Cancel button
+    this.shadowRoot.getElementById('cancel-delete-btn').addEventListener('click', () => {
+      modal.classList.remove('show');
+    });
+    
+    // Confirm delete button
+    this.shadowRoot.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+      const deleteBtn = this.shadowRoot.getElementById('confirm-delete-btn');
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = 'Deleting...';
+      
+      try {
+        if (isRecurring) {
+          // Get the selected option
+          const selectedOption = this.shadowRoot.querySelector('input[name="delete-option"]:checked')?.value;
+          
+          if (selectedOption === 'this') {
+            // Delete this instance only
+            await this.deleteEvent(event.entityId, event.uid, event.recurrence_id);
+          } else if (selectedOption === 'future') {
+            // Delete this and future instances
+            await this.deleteEvent(event.entityId, event.uid, event.recurrence_id, 'THISANDFUTURE');
+          } else {
+            // Delete entire series
+            await this.deleteEvent(event.entityId, event.uid);
+          }
+        } else {
+          // Delete single event
+          await this.deleteEvent(event.entityId, event.uid);
+        }
+        
+        modal.classList.remove('show');
+        
+        // Refresh events
+        this._lastFetch = null;
+        await this.updateEvents();
+      } catch (error) {
+        console.error('Failed to delete event:', error);
+        alert(error.message || 'Failed to delete event. Please try again.');
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = 'Delete';
+      }
+    });
+  }
+
+  showFormError(errorDiv, message) {
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+    setTimeout(() => {
+      errorDiv.style.display = 'none';
+    }, 5000);
+  }
+
+  showError(message) {
+    console.error(message);
+    // Could add a toast notification here
   }
 
   showEventModal(event) {
@@ -1617,8 +2816,23 @@ class SkylightCalendarCard extends HTMLElement {
       }
     }
     
-    // Get calendar info
+    // Get calendar info and capabilities
     const calendarName = this.getCalendarName(event.entityId);
+    const capabilities = this._calendarCapabilities[event.entityId] || {};
+    
+    // For edit/delete to work, we need:
+    // 1. Event management enabled
+    // 2. Calendar not read-only
+    // 3. Event has a UID (required for modifications)
+    // 4. Not a Google Calendar (they don't support these operations via HA)
+    const hasUID = event.uid !== undefined && event.uid !== null && event.uid !== '';
+    const canModify = this._config.enable_event_management && 
+                     !capabilities.isReadonly && 
+                     hasUID &&
+                     !capabilities.isGoogleCalendar;
+    
+    const canEdit = canModify;
+    const canDelete = canModify && capabilities.canDelete;
     
     content.innerHTML = `
       <div class="modal-header">
@@ -1669,13 +2883,55 @@ class SkylightCalendarCard extends HTMLElement {
             </div>
           </div>
         ` : ''}
+        ${event.rrule ? `
+          <div class="modal-row">
+            <div class="modal-label">🔁 Recurrence</div>
+            <div class="modal-value">Recurring Event</div>
+          </div>
+        ` : ''}
+        
+        ${!canModify && !capabilities.isReadonly && capabilities.isGoogleCalendar ? `
+          <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 12px; margin-top: 16px; font-size: 13px; color: #92400e;">
+            <strong>ℹ️ Google Calendar Limitation:</strong> Editing and deleting events is not currently supported for Google Calendar through Home Assistant. Please use the Google Calendar app or website to modify this event.
+          </div>
+        ` : ''}
+        
+        ${!canModify && !hasUID && !capabilities.isGoogleCalendar ? `
+          <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 12px; margin-top: 16px; font-size: 13px; color: #92400e;">
+            <strong>ℹ️ Cannot Modify:</strong> This event is missing required information (UID) for editing or deletion. You may need to recreate it.
+          </div>
+        ` : ''}
+        
+        ${(canEdit || canDelete) ? `
+          <div class="modal-actions">
+            <div class="modal-actions-left">
+              ${canDelete ? `<button class="btn btn-danger" id="delete-event-btn">Delete</button>` : ''}
+            </div>
+            <div class="modal-actions-right">
+              ${canEdit ? `<button class="btn btn-primary" id="edit-event-btn">Edit</button>` : ''}
+            </div>
+          </div>
+        ` : ''}
       </div>
     `;
     
     modal.classList.add('show');
     
+    // Close button
     this.shadowRoot.getElementById('close-modal')?.addEventListener('click', () => {
       modal.classList.remove('show');
+    });
+    
+    // Edit button
+    this.shadowRoot.getElementById('edit-event-btn')?.addEventListener('click', () => {
+      modal.classList.remove('show');
+      this.showEditEventModal(event, startDate, endDate, isAllDay);
+    });
+    
+    // Delete button
+    this.shadowRoot.getElementById('delete-event-btn')?.addEventListener('click', () => {
+      modal.classList.remove('show');
+      this.showDeleteConfirmation(event);
     });
   }
 
@@ -1683,21 +2939,55 @@ class SkylightCalendarCard extends HTMLElement {
     const modal = this.shadowRoot.getElementById('event-modal');
     const content = this.shadowRoot.getElementById('modal-content');
     
+    // Sort events: all-day first, then by start time (same as calendar view)
+    const sortedEvents = events.sort((a, b) => {
+      const aIsAllDay = a.start.date || !a.start.includes?.('T');
+      const bIsAllDay = b.start.date || !b.start.includes?.('T');
+      
+      // All-day events come first
+      if (aIsAllDay && !bIsAllDay) return -1;
+      if (!aIsAllDay && bIsAllDay) return 1;
+      
+      // Both same type, sort by time
+      const aTime = new Date(a.start.dateTime || a.start.date || a.start);
+      const bTime = new Date(b.start.dateTime || b.start.date || b.start);
+      return aTime - bTime;
+    });
+    
     content.innerHTML = `
       <div class="modal-header">
         <h3 class="modal-title">${this.formatDate(date)}</h3>
         <button class="modal-close" id="close-modal">×</button>
       </div>
       <div class="modal-body">
-        ${events.map(event => `
-          <div style="margin-bottom: 16px; padding: 12px; background: ${event.color}15; border-left: 4px solid ${event.color}; border-radius: 4px; cursor: pointer;" class="day-event" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
-            <div style="font-weight: 600; margin-bottom: 4px;">${this.escapeHtml(event.summary || 'Untitled Event')}</div>
-            <div style="font-size: 13px; color: #6b7280;">
-              ${!event.all_day ? this.formatTime(new Date(event.start)) + ' - ' + this.formatTime(new Date(event.end)) : 'All Day'}
+        ${sortedEvents.map(event => {
+          // Parse event times properly
+          let startTime, endTime, isAllDay;
+          
+          if (event.start.dateTime) {
+            startTime = new Date(event.start.dateTime);
+            endTime = new Date(event.end.dateTime);
+            isAllDay = false;
+          } else if (event.start.date) {
+            startTime = new Date(event.start.date + 'T00:00:00');
+            endTime = new Date(event.end.date + 'T00:00:00');
+            isAllDay = true;
+          } else {
+            startTime = new Date(event.start);
+            endTime = new Date(event.end);
+            isAllDay = !event.start.includes('T');
+          }
+          
+          return `
+            <div style="margin-bottom: 16px; padding: 12px; background: ${event.color}15; border-left: 4px solid ${event.color}; border-radius: 4px; cursor: pointer;" class="day-event" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
+              <div style="font-weight: 600; margin-bottom: 4px;">${this.escapeHtml(event.summary || 'Untitled Event')}</div>
+              <div style="font-size: 13px; color: #6b7280;">
+                ${isAllDay ? 'All Day' : `${this.formatTime(startTime)} - ${this.formatTime(endTime)}`}
+              </div>
+              ${event.location ? `<div style="font-size: 13px; color: #6b7280; margin-top: 4px;">📍 ${this.escapeHtml(event.location)}</div>` : ''}
             </div>
-            ${event.location ? `<div style="font-size: 13px; color: #6b7280; margin-top: 4px;">📍 ${this.escapeHtml(event.location)}</div>` : ''}
-          </div>
-        `).join('')}
+          `;
+        }).join('')}
       </div>
     `;
     
@@ -1770,7 +3060,8 @@ class SkylightCalendarCard extends HTMLElement {
       first_day_of_week: 0,
       week_days: [0, 1, 2, 3, 4, 5, 6],
       week_start_hour: 8,
-      week_end_hour: 21
+      week_end_hour: 21,
+      enable_event_management: true
     };
   }
 

@@ -13,16 +13,14 @@ A beautiful, customizable calendar card for Home Assistant that mimics the desig
 - 🎯 **Multiple Calendars**: Support for multiple calendar entities with custom colors
 - 👁️ **Calendar Filtering**: Click calendar badges to show/hide specific calendars
 - 🖱️ **Interactive**: Click on events to view full details in a popup
+- ➕ **Event Management**: Create, edit, and delete events directly from the calendar
+- 🔁 **Recurring Events**: Smart handling of recurring event modifications
 - 📱 **Responsive**: Works great on desktop, tablet, and mobile
 - 🔄 **Real-time Updates**: Automatically syncs with your Home Assistant calendars
 - 🎨 **Customizable**: Configure colors, starting day of week, visible days, and more
 - 🌈 **Custom Header Colors**: Personalize the banner with solid colors or gradients
 - ⏰ **Flexible Schedule**: Customize time range for schedule view (e.g., 8am-9pm)
 - 📏 **Height Control**: Adjust vertical scale or enable compact mode to fit screen
-- 🎯 **Concurrent Events**: Events at the same time display side-by-side
-- 📌 **All-Day Events**: Displayed at top of day with dynamic height allocation
-- 🔢 **Smart Sorting**: All-day events first, then chronological order by start time
-- 📐 **Precise Positioning**: Events positioned at exact time slots with minute precision
 - 🎛️ **Default View**: Set which view loads by default (month/week/schedule)
 - 📏 **Compact Header**: Optional single-row header layout for space savings
 
@@ -86,6 +84,9 @@ week_end_hour: 21   # End hour for week-standard view (9pm = 21)
 height_scale: 0.6   # Make schedule more compact (50-200%)
 compact_height: true  # Fit to screen with scrolling
 compact_header: true  # Single-row header layout
+enable_event_management: true  # Enable event creation (default: true)
+readonly_calendars:  # Calendars that cannot be modified
+  - calendar.holidays
 colors:
   calendar.personal: '#FF6B6B'
   calendar.work: '#4ECDC4'
@@ -133,6 +134,8 @@ This mode is perfect for:
 | `compact_height` | boolean | `false` | Fit calendar to screen height with scroll |
 | `compact_header` | boolean | `false` | Single-row header with inline badges |
 | `show_week_numbers` | boolean | `false` | Show week numbers on the left side |
+| `enable_event_management` | boolean | `true` | Enable event creation features |
+| `readonly_calendars` | list | `[]` | Calendar entities that should not allow modifications |
 | `max_events` | integer | `100` | Maximum number of events to load |
 | `colors` | map | auto | Custom colors for each calendar entity |
 
@@ -144,15 +147,6 @@ This card requires Home Assistant calendar entities. You can integrate calendars
 - **CalDAV** (Apple Calendar, Nextcloud, etc.): [Integration Guide](https://www.home-assistant.io/integrations/caldav/)
 - **Local Calendar**: [Integration Guide](https://www.home-assistant.io/integrations/local_calendar/)
 - **Office 365**: [Integration Guide](https://www.home-assistant.io/integrations/microsoft/)
-
-### Example Calendar Configuration
-
-```yaml
-# configuration.yaml
-google:
-  client_id: YOUR_CLIENT_ID
-  client_secret: YOUR_CLIENT_SECRET
-```
 
 After setting up the integration, calendar entities will be automatically created (e.g., `calendar.personal`, `calendar.work`).
 
@@ -246,32 +240,6 @@ header_color: 'var(--card-background-color)'
 header_color: 'var(--primary-color)'
 ```
 
-### Concurrent Events
-
-When multiple events happen at the same time in schedule view, they automatically display side-by-side instead of overlapping:
-
-- Events are detected for overlaps using precise minute-based timing
-- Each concurrent event gets its own column with appropriate width
-- Non-overlapping events share columns for efficient use of space
-- Visual layout matches professional calendar applications
-
-### All-Day Events
-
-All-day events are handled specially across all views:
-
-- **Positioned first**: All-day events always appear before timed events
-- **Dynamic height**: The all-day section automatically sizes to fit the busiest day
-- **Consistent alignment**: All days show the same all-day section height
-- **Hidden when empty**: If no all-day events exist in the visible range, the section is completely removed
-
-### Event Sorting
-
-Events are automatically sorted for optimal viewing:
-
-1. **All-day events** appear first (top of list)
-2. **Timed events** follow in chronological order by start time
-3. Works consistently across all three view modes
-
 ### Event Details Modal
 
 Click on any event to see:
@@ -292,6 +260,139 @@ The current day is automatically highlighted with a blue background and the date
 
 - Click the arrow buttons to move between months
 - Click "Today" to jump back to the current month
+
+## Event Management
+
+### Creating Events
+
+The card now supports creating events directly from the calendar interface! This feature works with most calendar integrations including Local Calendar, Google Calendar, CalDAV, and Office 365.
+
+**Three Ways to Create Events:**
+
+1. **"+ Add Event" Button** - Click the button in the header to create an event
+2. **Click on a Day** - In month or week views, click on any day to create an event on that date
+3. **Click on a Time Slot** - In schedule view, click on a specific time to create an event at that exact time
+
+**Event Creation Form:**
+
+The event creation modal includes:
+- **Calendar Selection** - Choose which calendar to add the event to (only writable calendars shown)
+- **Event Title** (required) - Name of your event
+- **All-Day Toggle** - Switch between all-day events and timed events
+- **Start/End Time** - For timed events, select exact start and end times
+- **Start/End Date** - For all-day events, select the date range
+  - Example: Single-day event on Feb 4 → Start: Feb 4, End: Feb 4
+  - Example: Two-day event (Feb 4-5) → Start: Feb 4, End: Feb 5
+  - Example: Three-day event (Feb 4-6) → Start: Feb 4, End: Feb 6
+- **Location** - Optional location field
+- **Description** - Optional detailed description
+
+**Smart Defaults:**
+
+- When clicking a day, the event defaults to that date
+- When clicking a time slot in schedule view, the event defaults to that exact time
+- Timed events default to 1-hour duration
+- Times are automatically rounded to the nearest 30 minutes
+
+### Editing Events
+
+Click on any event to view its details, then click the **"Edit"** button to modify it.
+
+**What You Can Edit:**
+- Change event title, location, and description
+- Modify start and end times/dates
+- Switch between all-day and timed events
+- Move event to a different calendar
+
+**How It Works:**
+- If the calendar supports the UPDATE service, changes are applied directly
+- Otherwise, the event is automatically deleted and recreated with new details
+- All editing is seamless - you don't need to know which method is used!
+
+**Moving Events Between Calendars:**
+You can change which calendar an event belongs to by selecting a different calendar in the dropdown. The event will be removed from the old calendar and created in the new one.
+
+### Deleting Events
+
+Click on any event and click the **"Delete"** button to remove it.
+
+**Simple Deletion:**
+For non-recurring events, you'll see a confirmation dialog. Click "Delete" to confirm.
+
+**Recurring Event Deletion:**
+For recurring events, you have three options:
+
+1. **This event only** - Delete just this one occurrence
+2. **This and future events** - Delete this occurrence and all future occurrences
+3. **All events** - Delete the entire recurring series
+
+**Example Scenarios:**
+- Weekly team meeting but you're on vacation next week → Choose "This event only"
+- Weekly meeting changing to bi-weekly starting today → Choose "This and future events"
+- Project cancelled, remove all project meetings → Choose "All events"
+
+**Example Configuration with Full Event Management:**
+
+```yaml
+type: custom:skylight-calendar-card
+title: Family Calendar
+entities:
+  - calendar.personal      # Writable - can create, edit, delete
+  - calendar.work          # Writable - can create, edit, delete
+  - calendar.holidays      # Read-only
+enable_event_management: true
+readonly_calendars:
+  - calendar.holidays  # Prevent creating/editing/deleting events on holidays calendar
+```
+
+### Calendar Integration Compatibility
+
+**Full Support (Create, Edit, Delete):**
+- ✅ **Local Calendar** - Full support with delete+create fallback for edits
+- ⚠️ **CalDAV** - Support varies by server (Nextcloud, iCloud, etc.)
+- ⚠️ **Office 365** - Create works; edit/delete support varies
+
+**Limited Support (Create Only):**
+- ⚠️ **Google Calendar** - **Create works**, but **edit/delete NOT supported** through Home Assistant
+  - **Why?** The Google Calendar integration doesn't expose the UPDATE/DELETE services
+  - **Workaround:** Use the Google Calendar app or website to edit/delete events
+  - Events created through this card can still be viewed in Home Assistant
+  - You'll see an informational message when viewing Google Calendar events
+
+**How Editing Works (Non-Google Calendars):**
+1. **UPDATE Service Available** - Event is modified directly (fastest, preserves UID)
+2. **Fallback Method** - Event is deleted and recreated (works on calendars with delete+create)
+
+**How Deletion Works (Non-Google Calendars):**
+- Uses the `calendar.delete_event` service
+- Only available if calendar integration supports deletion
+- Delete button is automatically hidden for calendars that don't support it
+
+**Note:** The card automatically detects which operations each calendar supports and shows/hides buttons accordingly. If you don't see an Edit or Delete button, your calendar integration doesn't support those operations or the event is missing required information (UID).
+
+### Disabling Event Management
+
+If you want a read-only calendar view:
+
+```yaml
+type: custom:skylight-calendar-card
+title: Family Calendar (Read-Only)
+entities:
+  - calendar.personal
+enable_event_management: false  # Disable all event management features
+```
+
+Or mark specific calendars as read-only:
+
+```yaml
+type: custom:skylight-calendar-card
+title: Family Calendar
+entities:
+  - calendar.personal
+  - calendar.holidays
+readonly_calendars:
+  - calendar.holidays  # Can view but not create events on holidays calendar
+```
 
 ## Tips and Tricks
 
@@ -385,7 +486,8 @@ This shows the title, calendar badges, and view controls all in one row, perfect
 
 - **Click calendar badges** at the top to show/hide that calendar's events
 - **Click any event** to see full details including duration, location, description, and attendees
-- **Click days** in month view to see all events for that day
+- **Click days or time slots** to create new events (when event management is enabled)
+- **Click "+ Add Event"** button for quick event creation
 
 ### Multiple Cards
 
@@ -412,6 +514,61 @@ Make sure you're using valid hex color codes (e.g., `#FF6B6B`, not `red`)
 1. Clear your browser cache
 2. Check browser console for errors (F12)
 3. Verify the resource is properly added to Lovelace
+
+### Cannot Create Events
+
+1. Verify `enable_event_management: true` in your configuration
+2. Check that the calendar is not in the `readonly_calendars` list
+3. Ensure the calendar integration supports event creation
+4. Check Home Assistant logs for service call errors
+
+### Cannot Edit or Delete Events
+
+If you don't see Edit or Delete buttons on events:
+
+1. **Google Calendar Users**: The Google Calendar integration **does not support** editing or deleting events through Home Assistant. This is a limitation of the integration itself, not this card. You must use the Google Calendar app or website to modify events.
+
+2. **Check Calendar Support**: Not all calendar integrations support editing/deleting
+   - Local Calendar: Supports deletion (editing uses delete+create)
+   - CalDAV: Varies by server implementation
+   - Office 365: Varies by setup
+
+3. **Check Configuration**:
+   ```yaml
+   enable_event_management: true  # Must be enabled
+   readonly_calendars: []  # Calendar should not be in this list
+   ```
+
+4. **Missing UID**: Some events may not have a UID field, which is required for editing/deleting
+
+### Google Calendar: "Please use the Google Calendar app or website"
+
+This is **expected behavior**. The Home Assistant Google Calendar integration does not expose the services needed to edit or delete events. This is a limitation of the integration.
+
+**Solutions:**
+- **To edit/delete**: Use the official Google Calendar app or https://calendar.google.com
+- **To create**: You can still create events through this card - they will appear in Google Calendar
+- **Alternative**: Use a Local Calendar or CalDAV calendar if you need full editing support in Home Assistant
+
+### Edit/Delete Fails with "Calendar does not support modifications"
+
+This means:
+- The calendar integration doesn't expose the UPDATE or DELETE services
+- The event doesn't have a UID (required for modifications)
+- The calendar is marked as read-only in your configuration
+
+**Workaround**: You can manually delete/recreate events through the calendar integration's native interface.
+
+### "No writable calendars available" Error
+
+This means all your calendars are either:
+- Read-only (in the `readonly_calendars` list)
+- Don't support event creation
+
+**Solution:**
+1. Remove calendars from `readonly_calendars` list
+2. Verify your calendar integration supports creation
+3. Add a Local Calendar for testing
 
 ## Development
 
