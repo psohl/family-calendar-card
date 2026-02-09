@@ -1747,29 +1747,57 @@ class SkylightCalendarCard extends HTMLElement {
       return (b.endMinutes - b.startMinutes) - (a.endMinutes - a.startMinutes);
     });
     
-    // Detect overlapping events and assign columns
-    const columns = [];
+    const overlaps = (first, second) =>
+      first.startMinutes < second.endMinutes && first.endMinutes > second.startMinutes;
+
+    const clusters = [];
     eventBlocks.forEach(block => {
-      // Find a column where this event doesn't overlap
-      let placed = false;
-      for (let col of columns) {
-        const overlaps = col.some(other => 
-          block.startMinutes < other.endMinutes && block.endMinutes > other.startMinutes
-        );
-        if (!overlaps) {
-          col.push(block);
-          block.column = columns.indexOf(col);
-          placed = true;
-          break;
+      const matchingClusters = [];
+      clusters.forEach((cluster, index) => {
+        if (cluster.some(other => overlaps(block, other))) {
+          matchingClusters.push(index);
         }
+      });
+
+      if (matchingClusters.length === 0) {
+        clusters.push([block]);
+        return;
       }
-      if (!placed) {
-        columns.push([block]);
-        block.column = columns.length - 1;
-      }
+
+      const targetIndex = matchingClusters.shift();
+      clusters[targetIndex].push(block);
+
+      matchingClusters.reverse().forEach(index => {
+        clusters[targetIndex].push(...clusters[index]);
+        clusters.splice(index, 1);
+      });
     });
-    
-    const totalColumns = columns.length;
+
+    clusters.forEach(cluster => {
+      const columns = [];
+      cluster.forEach(block => {
+        let placed = false;
+        for (const col of columns) {
+          const hasOverlap = col.some(other => overlaps(block, other));
+          if (!hasOverlap) {
+            col.push(block);
+            block.column = columns.indexOf(col);
+            placed = true;
+            break;
+          }
+        }
+
+        if (!placed) {
+          columns.push([block]);
+          block.column = columns.length - 1;
+        }
+      });
+
+      const clusterColumns = columns.length;
+      cluster.forEach(block => {
+        block.clusterColumns = clusterColumns;
+      });
+    });
     
     // Render timed events
     return eventBlocks.map(block => {
@@ -1779,9 +1807,10 @@ class SkylightCalendarCard extends HTMLElement {
       const top = (startHourFloat - startHour) * hourHeight;
       const height = duration * hourHeight;
       
+      const clusterColumns = block.clusterColumns || 1;
       // Calculate width and position for concurrent events
-      const width = totalColumns > 1 ? `calc((100% - 16px) / ${totalColumns})` : 'calc(100% - 16px)';
-      const left = totalColumns > 1 ? `calc(8px + ((100% - 16px) / ${totalColumns}) * ${column})` : '8px';
+      const width = clusterColumns > 1 ? `calc((100% - 16px) / ${clusterColumns})` : 'calc(100% - 16px)';
+      const left = clusterColumns > 1 ? `calc(8px + ((100% - 16px) / ${clusterColumns}) * ${column})` : '8px';
       
       const bgColor = this.lightenColor(event.color, 0.85);
       
