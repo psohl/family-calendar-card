@@ -519,7 +519,6 @@ class SkylightCalendarCard extends HTMLElement {
     // Gate fetches on the actually visible range. If the user can already see
     // all required dates from loaded data, avoid any network call.
     if (this.isDateRangeCoveredByLoadedEvents(visibleStartDate, visibleEndDate)) {
-      this.render();
       return;
     }
 
