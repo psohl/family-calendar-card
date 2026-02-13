@@ -201,6 +201,7 @@ The event creation modal includes:
   - Example: Three-day event (Feb 4-6) → Start: Feb 4, End: Feb 6
 - **Location** - Optional location field
 - **Description** - Optional detailed description
+- **Recurring Events** - Optional recurring schedule (Daily/Weekly/Monthly/Yearly) with interval, optional weekdays for weekly rules, and optional end date
 
 **Smart Defaults:**
 
@@ -208,6 +209,34 @@ The event creation modal includes:
 - When clicking a time slot in schedule view, the event defaults to that exact time
 - Timed events default to 1-hour duration
 - Times are automatically rounded to the nearest 30 minutes
+- Recurrence uses the Home Assistant Calendar WebSocket API (`calendar/event/create`) with `rrule`, compatible with Google Calendar-backed entities
+
+### Recurring Events with Google Calendar (Home Assistant docs)
+
+Home Assistant supports recurring event creation by sending an RFC5545 `rrule` through the Calendar WebSocket API (`calendar/event/create`). The `calendar.create_event` service is used for non-recurring events in this card.
+
+Useful references:
+- Home Assistant Calendar integration actions (`calendar.create_event`, `calendar.update_event`, `calendar.delete_event`): https://www.home-assistant.io/integrations/calendar/
+- Home Assistant Google integration (Google Calendar entities): https://www.home-assistant.io/integrations/google/
+
+Example WebSocket payload:
+
+```json
+{
+  "type": "calendar/event/create",
+  "entity_id": "calendar.family",
+  "event": {
+    "summary": "Team sync",
+    "dtstart": "2026-02-13T18:00:00Z",
+    "dtend": "2026-02-13T19:00:00Z",
+    "rrule": "FREQ=WEEKLY;BYDAY=MO,WE"
+  }
+}
+```
+
+Other valid RRULE examples:
+- `FREQ=MONTHLY;COUNT=10`
+- `FREQ=DAILY;UNTIL=20261231T235959Z`
 
 ### Editing Events
 
