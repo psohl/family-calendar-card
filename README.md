@@ -25,6 +25,7 @@ A beautiful, customizable calendar card for Home Assistant that mimics the desig
 - 📏 **Compact Header**: Optional single-row header layout for space savings
 - **Multiple Language Support**: Supports English, French, and German, with an extensible framework for adding more languages
 - **Locale Support**: Supports various locales for setting days of week, month names, etc
+- **Dark Mode**: Add dark mode
 
 ## Installation
 
@@ -90,6 +91,7 @@ hide_event_calendar_bubble: false  # Hide the calendar initial bubble on events
 hide_times_for_calendars:  # Hide start/end times in schedule view for specific calendars
   - calendar.kids_activities
 show_current_time_bar: true  # Show a red "current time" line in schedule view
+default_dark_mode: true  # Start the card in dark mode on first load
 enable_event_management: true  # Enable event creation (default: true)
 readonly_calendars:  # Calendars that cannot be modified
   - calendar.holidays
@@ -168,6 +170,7 @@ rolling_weeks: 3  # Show current + 3 more weeks (28 days)
 | `hide_event_calendar_bubble` | boolean | `false` | Hide the calendar initial bubble shown inside events |
 | `hide_times_for_calendars` | list | `[]` | Calendar entities whose start/end times should be hidden in schedule view |
 | `show_current_time_bar` | boolean | `false` | Show a red current-time indicator line in schedule view |
+| `default_dark_mode` | boolean | `false` | Start the card in dark mode on load (legacy alias: `dark_mode`) |
 | `show_week_numbers` | boolean | `false` | Show week numbers on the left side |
 | `max_events` | integer | `100` | Maximum number of events to load |
 | `enable_event_management` | boolean | `true` | Enable event creation features |

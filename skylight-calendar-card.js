@@ -353,6 +353,7 @@ class SkylightCalendarCard extends HTMLElement {
     this._calendarCapabilities = {}; // Track calendar capabilities
     this._activeLanguage = DEFAULT_LANGUAGE;
     this._hasCustomTitle = false;
+    this._isDarkMode = false;
   }
 
   setConfig(config) {
@@ -387,9 +388,11 @@ class SkylightCalendarCard extends HTMLElement {
       readonly_calendars: config.readonly_calendars || [], // Calendars that should not allow modifications
       language: config.language || null, // Language code for translations (e.g., 'en', 'de', 'fr')
       locale: config.locale || null, // Locale override for date/time formatting (e.g., 'en-US')
+      default_dark_mode: config.default_dark_mode ?? config.dark_mode ?? false, // Start in dark mode on initial load
       ...config
     };
     this._viewMode = this._config.default_view;
+    this._isDarkMode = !!this._config.default_dark_mode;
     this._loadedEventRange = null;
     this.setWeekStart();
     this.render();
@@ -957,6 +960,27 @@ class SkylightCalendarCard extends HTMLElement {
       .today-button:hover {
         background: rgba(255, 255, 255, 0.3);
       }
+
+      .theme-toggle {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+        transition: all 0.2s;
+      }
+
+      .theme-toggle:hover {
+        background: rgba(255, 255, 255, 0.3);
+        border-color: rgba(255, 255, 255, 0.6);
+      }
       
       .month-year {
         font-size: 18px;
@@ -1023,7 +1047,7 @@ class SkylightCalendarCard extends HTMLElement {
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 0 auto 4px;
+        margin-bottom: 4px;
       }
       
       .event {
@@ -1299,6 +1323,7 @@ class SkylightCalendarCard extends HTMLElement {
       
       .all-day-event {
         padding: 4px 8px;
+        color: white;
         border-radius: 6px;
         cursor: pointer;
         transition: transform 0.2s, box-shadow 0.2s;
@@ -1320,7 +1345,7 @@ class SkylightCalendarCard extends HTMLElement {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        color: #1f2937;
+        color: inherit;
       }
       
       .day-time-slot {
@@ -1340,7 +1365,7 @@ class SkylightCalendarCard extends HTMLElement {
         position: absolute;
         left: 8px;
         right: 8px;
-        color: #1f2937;
+        color: white;
         padding: 6px 8px;
         border-radius: 8px;
         font-size: 12px;
@@ -1831,6 +1856,211 @@ class SkylightCalendarCard extends HTMLElement {
         font-size: 14px;
         opacity: 0.8;
       }
+
+      .day-modal-event {
+        margin-bottom: 16px;
+        padding: 12px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .day-modal-event-title {
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+
+      .day-modal-event-meta {
+        font-size: 13px;
+        color: #6b7280;
+      }
+
+      .day-modal-event-location {
+        font-size: 13px;
+        color: #6b7280;
+        margin-top: 4px;
+      }
+
+      .info-banner {
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 16px;
+        font-size: 13px;
+      }
+
+      .info-banner.warning {
+        background: #fef3c7;
+        border: 1px solid #fbbf24;
+        color: #92400e;
+      }
+
+
+      .calendar-container.dark-mode {
+        background: #2a2f36;
+        color: #e8ecf1;
+      }
+
+      .calendar-container.dark-mode .week-standard-container,
+      .calendar-container.dark-mode .calendar-badges {
+        background: #30363f;
+        border-color: #4b5563;
+      }
+
+      .calendar-container.dark-mode .day-cell,
+      .calendar-container.dark-mode .week-day-column,
+      .calendar-container.dark-mode .week-day-header,
+      .calendar-container.dark-mode .week-standard-day-column,
+      .calendar-container.dark-mode .week-standard-day-header,
+      .calendar-container.dark-mode .all-day-events,
+      .calendar-container.dark-mode .day-time-slot,
+      .calendar-container.dark-mode .time-slot,
+      .calendar-container.dark-mode .time-slot-label,
+      .calendar-container.dark-mode .empty-state {
+        background: #353c45;
+        color: #dde3ea;
+        border-color: #556070;
+      }
+
+	  .calendar-container.dark-mode .day-header {
+        background: #353b42;
+        color: #dde3ea;
+        border-color: #556070;
+      }
+
+      .calendar-container.dark-mode .week-day-column.today .week-day-header {
+        border-bottom-color: #3b82f6;
+      }
+	  
+      .calendar-container.dark-mode .week-standard-day-name,
+      .calendar-container.dark-mode .week-standard-day-date,
+      .calendar-container.dark-mode .week-day-name,
+      .calendar-container.dark-mode .week-day-date {
+        background: #3b434d;
+        color: #dde3ea;
+        border-color: #556070;
+      }
+	  
+      .calendar-container.dark-mode .week-day-column.today .week-day-date {
+        color: #3b82f6;
+      }
+	  
+      .calendar-container.dark-mode .week-standard-day-column.today .week-standard-day-date {
+        background: #3b82f6;
+        color: white;
+        border-radius: 50%;
+      }
+
+      .calendar-container.dark-mode .day-cell:hover,
+      .calendar-container.dark-mode .day-time-slot:hover,
+      .calendar-container.dark-mode .recurring-option:hover,
+      .calendar-container.dark-mode .modal-close:hover,
+      .calendar-container.dark-mode .btn-secondary:hover {
+        background: #3f4752;
+      }
+
+      .calendar-container.dark-mode .day-cell.other-month {
+        background: #2f353e;
+      }
+
+      .calendar-container.dark-mode .day-number,
+      .calendar-container.dark-mode .month-year,
+      .calendar-container.dark-mode .all-day-event-title,
+      .calendar-container.dark-mode .week-standard-event,
+      .calendar-container.dark-mode .modal-title,
+      .calendar-container.dark-mode .confirm-title,
+      .calendar-container.dark-mode .recurring-option-title {
+        color: #f4f7fb;
+      }
+
+      .calendar-container.dark-mode .event-time,
+      .calendar-container.dark-mode .more-events,
+      .calendar-container.dark-mode .week-standard-event-time,
+      .calendar-container.dark-mode .modal-label,
+      .calendar-container.dark-mode .confirm-message,
+      .calendar-container.dark-mode .recurring-option-description,
+      .calendar-container.dark-mode .day-modal-event-meta,
+      .calendar-container.dark-mode .day-modal-event-location,
+      .calendar-container.dark-mode .empty-state {
+        color: #c7d0db;
+      }
+
+      .calendar-container.dark-mode .event,
+      .calendar-container.dark-mode .week-compact-event,
+      .calendar-container.dark-mode .week-standard-event,
+      .calendar-container.dark-mode .all-day-event,
+      .calendar-container.dark-mode .week-standard-day-column,
+      .calendar-container.dark-mode .week-day-column,
+      .calendar-container.dark-mode .modal-content,
+      .calendar-container.dark-mode .confirm-dialog,
+      .calendar-container.dark-mode .form-input,
+      .calendar-container.dark-mode .form-select,
+      .calendar-container.dark-mode .form-textarea,
+      .calendar-container.dark-mode .recurring-options,
+      .calendar-container.dark-mode .btn-secondary,
+      .calendar-container.dark-mode .day-modal-event {
+        background: #3b434d;
+        color: #e2e8f0;
+        border-color: #606b7b;
+        box-shadow: none;
+      }
+
+      .calendar-container.dark-mode .modal-header,
+      .calendar-container.dark-mode .modal-row {
+        border-color: #5b6676;
+      }
+
+      .calendar-container.dark-mode .form-checkbox-label,
+      .calendar-container.dark-mode .recurrence-end-option,
+      .calendar-container.dark-mode .modal-value,
+      .calendar-container.dark-mode .form-label {
+        color: #d6dee8;
+      }
+
+      .calendar-container.dark-mode .form-required {
+        color: #f87171;
+      }
+
+      .calendar-container.dark-mode .form-input::placeholder,
+      .calendar-container.dark-mode .form-textarea::placeholder {
+        color: #9aa6b8;
+      }
+
+      .calendar-container.dark-mode input[type="date"]::-webkit-calendar-picker-indicator,
+      .calendar-container.dark-mode input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+      .calendar-container.dark-mode input[type="time"]::-webkit-calendar-picker-indicator {
+        filter: invert(1) brightness(0.9);
+      }
+
+      .calendar-container.dark-mode .btn-secondary {
+        border: 1px solid #606b7b;
+      }
+
+      .calendar-container.dark-mode .info-banner {
+        background: #5a4a34;
+        border-color: #8f7a56;
+        color: #f3e5c7;
+      }
+
+      .calendar-container.dark-mode .view-mode-buttons,
+      .calendar-container.dark-mode .nav-button,
+      .calendar-container.dark-mode .today-button,
+      .calendar-container.dark-mode .theme-toggle {
+        background: rgba(226, 232, 240, 0.14);
+        border-color: rgba(226, 232, 240, 0.28);
+      }
+
+      .calendar-container.dark-mode .view-mode-button.active {
+        background: rgba(226, 232, 240, 0.24);
+      }
+
+      .calendar-container.dark-mode .week-day-header,
+      .calendar-container.dark-mode .week-standard-day-header {
+        background: #3b434d;
+      }
+
+      .calendar-container.dark-mode .week-standard-event-time,
+      .calendar-container.dark-mode .event-time {
+        color: rgba(255, 255, 255, 0.92);
+      }
       
       @media (max-width: 768px) {
         .header {
@@ -1875,14 +2105,14 @@ class SkylightCalendarCard extends HTMLElement {
         ${this.getStyles()}
       </style>
       
-      <div class="calendar-container" style="${headerColorStyle}">
+      <div class="calendar-container ${this._isDarkMode ? 'dark-mode' : ''}" style="${headerColorStyle}">
         ${this._config.compact_header ? this.renderCompactHeader() : this.renderStandardHeader()}
         
         ${this.renderCalendarView()}
-      </div>
-      
-      <div class="event-modal" id="event-modal">
-        <div class="modal-content" id="modal-content">
+
+        <div class="event-modal" id="event-modal">
+          <div class="modal-content" id="modal-content">
+          </div>
         </div>
       </div>
     `;
@@ -1901,6 +2131,7 @@ class SkylightCalendarCard extends HTMLElement {
           ${canAddEvents ? `<button class="add-event-button" id="add-event-btn"><span class="icon">+</span>${this.t('addEvent')}</button>` : ''}
         </div>
         <div class="header-controls">
+          ${this.renderThemeToggle()}
           ${this.renderViewModeButtons()}
           <button class="nav-button" id="prev-period">‹</button>
           <div class="month-year">${this.getPeriodLabel()}</div>
@@ -1923,6 +2154,7 @@ class SkylightCalendarCard extends HTMLElement {
           ${canAddEvents ? `<button class="add-event-button" id="add-event-btn"><span class="icon">+</span>${this.t('addEvent')}</button>` : ''}
         </div>
         <div class="header-controls">
+          ${this.renderThemeToggle()}
           ${this.renderViewModeButtons()}
           <button class="nav-button" id="prev-period">‹</button>
           <div class="month-year">${this.getPeriodLabel()}</div>
@@ -1966,6 +2198,10 @@ class SkylightCalendarCard extends HTMLElement {
         <button class="view-mode-button ${this._viewMode === 'week-standard' ? 'active' : ''}" data-view="week-standard">${this.t('schedule')}</button>
       </div>
     `;
+  }
+
+  renderThemeToggle() {
+    return `<button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">${this._isDarkMode ? '☀︎' : '☾'}</button>`;
   }
 
   getPeriodLabel() {
@@ -2200,7 +2436,7 @@ class SkylightCalendarCard extends HTMLElement {
     return `
       <div class="all-day-events" style="min-height: ${allDayHeight}px; height: ${allDayHeight}px;">
         ${allDayEvents.length > 0 ? allDayEvents.map(event => {
-          const bgColor = this.lightenColor(event.color, 0.85);
+          const bgColor = event.color;
           return `
             <div class="all-day-event" 
                  style="background: ${bgColor}; border-left: 4px solid ${event.color}"
@@ -2323,7 +2559,7 @@ class SkylightCalendarCard extends HTMLElement {
       const width = clusterColumns > 1 ? `calc((100% - 16px) / ${clusterColumns})` : 'calc(100% - 16px)';
       const left = clusterColumns > 1 ? `calc(8px + ((100% - 16px) / ${clusterColumns}) * ${column})` : '8px';
       
-      const bgColor = this.lightenColor(event.color, 0.85);
+      const bgColor = event.color;
       
       return `
         <div class="week-standard-event" 
@@ -2594,6 +2830,7 @@ class SkylightCalendarCard extends HTMLElement {
     const nextButton = this.shadowRoot.getElementById('next-period');
     const todayButton = this.shadowRoot.getElementById('today');
     const addEventButton = this.shadowRoot.getElementById('add-event-btn');
+    const themeToggleButton = this.shadowRoot.getElementById('theme-toggle');
     const modal = this.shadowRoot.getElementById('event-modal');
     
     // View mode buttons
@@ -2622,6 +2859,11 @@ class SkylightCalendarCard extends HTMLElement {
     // Add event button
     addEventButton?.addEventListener('click', () => {
       this.showCreateEventModal();
+    });
+
+    themeToggleButton?.addEventListener('click', () => {
+      this._isDarkMode = !this._isDarkMode;
+      this.render();
     });
     
     prevButton?.addEventListener('click', () => {
@@ -4216,13 +4458,13 @@ class SkylightCalendarCard extends HTMLElement {
         ` : ''}
         
         ${!canModify && !capabilities.isReadonly && capabilities.isGoogleCalendar ? `
-          <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 12px; margin-top: 16px; font-size: 13px; color: #92400e;">
+          <div class="info-banner warning">
             <strong>${this.t('googleCalendarLimitationTitle')}</strong> ${this.t('googleCalendarLimitationBody')}
           </div>
         ` : ''}
         
         ${!canModify && !hasUID && !capabilities.isGoogleCalendar ? `
-          <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 12px; margin-top: 16px; font-size: 13px; color: #92400e;">
+          <div class="info-banner warning">
             <strong>${this.t('cannotModifyTitle')}</strong> ${this.t('cannotModifyBody')}
           </div>
         ` : ''}
@@ -4279,12 +4521,12 @@ class SkylightCalendarCard extends HTMLElement {
           const { segmentStart, segmentEnd, isAllDaySegment } = daySegment;
 
           return `
-            <div style="margin-bottom: 16px; padding: 12px; background: ${event.color}15; border-left: 4px solid ${event.color}; border-radius: 4px; cursor: pointer;" class="day-event" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
-              <div style="font-weight: 600; margin-bottom: 4px;">${this.escapeHtml(event.summary || this.t('untitledEvent'))}</div>
-              <div style="font-size: 13px; color: #6b7280;">
+            <div class="day-event day-modal-event" style="background: ${event.color}15; border-left: 4px solid ${event.color};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
+              <div class="day-modal-event-title">${this.escapeHtml(event.summary || this.t('untitledEvent'))}</div>
+              <div class="day-modal-event-meta">
                 ${isAllDaySegment ? this.t('allDay') : `${this.formatTime(segmentStart)} - ${this.formatTime(segmentEnd)}`}
               </div>
-              ${event.location ? `<div style="font-size: 13px; color: #6b7280; margin-top: 4px;">📍 ${this.escapeHtml(event.location)}</div>` : ''}
+              ${event.location ? `<div class="day-modal-event-location">📍 ${this.escapeHtml(event.location)}</div>` : ''}
             </div>
           `;
         }).join('')}
