@@ -2,6 +2,12 @@
 
 A custom Lovelace calendar card inspired by the Skylight Calendar style.
 
+### Compact Week View
+![image](https://github.com/user-attachments/assets/5afbd7f5-5218-4b4d-b7f8-0272854418aa)
+
+### Schedule View
+![image](https://github.com/user-attachments/assets/d5c3ac1c-7da5-423d-88a9-d3cccbb54953)
+
 ## Prerequisite
 
 This card requires one or more **Home Assistant calendar entities** (for example: `calendar.family`, `calendar.work`, etc.).
@@ -33,13 +39,13 @@ entities:
 
 Full documentation has been moved to the wiki pages in this repository:
 
-- [Wiki Home](wiki/Home.md)
-- [Installation](wiki/Installation.md)
-- [Configuration](wiki/Configuration.md)
-- [Views & Navigation](wiki/Views-and-Navigation.md)
-- [Event Management](wiki/Event-Management.md)
-- [Troubleshooting](wiki/Troubleshooting.md)
-- [Compatibility with Card Mod](wiki/Compatibility-with-Card-Mod.md)
-- [Development](wiki/Development.md)
+- [Wiki Home](https://github.com/superdingo101/skylight-calendar-card/wiki)
+- [Installation](https://github.com/superdingo101/skylight-calendar-card/wiki/Installation)
+- [Configuration](https://github.com/superdingo101/skylight-calendar-card/wiki/Configuration)
+- [Views & Navigation](https://github.com/superdingo101/skylight-calendar-card/wiki/Views-and-Navigation)
+- [Event Management](https://github.com/superdingo101/skylight-calendar-card/wiki/Event-Management)
+- [Troubleshooting](https://github.com/superdingo101/skylight-calendar-card/wiki/Troubleshooting)
+- [Compatibility with Card Mod](https://github.com/superdingo101/skylight-calendar-card/wiki/Compatibility-with-Card-Mod)
+- [Development](https://github.com/superdingo101/skylight-calendar-card/wiki/Development)
 
-You can also browse by topic via the wiki sidebar: [Wiki Sidebar](wiki/_Sidebar.md).
+You can also browse by topic via the wiki sidebar: [Wiki Sidebar](https://github.com/superdingo101/skylight-calendar-card/wiki/_Sidebar).
