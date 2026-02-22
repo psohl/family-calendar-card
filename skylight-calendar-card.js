@@ -380,7 +380,7 @@ const TRANSLATIONS = {
       cannotModifyTitle: 'ℹ️ Kan het volgende niet aanpassen:',
       cannotModifyBody: 'Deze afspraak mist de vereiste informatie (UID) om te kunnen bewerken of verwijderen. Mogelijk moet je hem opnieuw aanmaken.',
       untitledEvent: 'Afspraak zonder onderwerp',
-      noWritableCalendars: 'Geen bewerkbare agenda's beschikbaar',
+      noWritableCalendars: "Geen bewerkbare agenda's beschikbaar",
       eventTitleRequired: 'Afspraak onderwerp is verplicht',
       startEndDatesRequired: 'Begin- en einddatum zijn verplicht',
       endDateBeforeStart: 'Einddatum mag niet voor begindatum zijn',
