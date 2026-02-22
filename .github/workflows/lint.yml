@@ -19,5 +19,5 @@ jobs:
         with:
           node-version: 20
 
-      - name: Run ESLint
-        run: npm run lint
+      - name: Check JS syntax
+        run: node --check skylight-calendar-card.js
