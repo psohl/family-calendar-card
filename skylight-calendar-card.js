@@ -456,6 +456,7 @@ class SkylightCalendarCard extends HTMLElement {
     this._weekStandardFixedOffsetHeight = null;
     this._weekStandardContainerTopInViewport = null;
     this._monthContainerTopInViewport = null;
+    this._activeModalBackHandler = null;
     this._handleViewportResize = () => {
       if (this.isEventManagementDialogOpen()) {
         return;
@@ -1401,6 +1402,7 @@ class SkylightCalendarCard extends HTMLElement {
 
       .calendar-grid.compact-month .day-cell {
         min-height: 0;
+        overflow: hidden;
       }
       
       .day-header {
@@ -1491,6 +1493,18 @@ class SkylightCalendarCard extends HTMLElement {
         color: #6b7280;
         margin-top: 2px;
         font-weight: 500;
+        cursor: pointer;
+        width: fit-content;
+      }
+
+      .more-events:hover {
+        text-decoration: underline;
+      }
+
+      .week-compact-container.single-day-modal {
+        grid-template-columns: 1fr;
+        border-top: none;
+        background: transparent;
       }
       
       /* Week Compact View Styles */
@@ -3247,10 +3261,11 @@ class SkylightCalendarCard extends HTMLElement {
     const verticalPadding = 16;
     const dayNumberHeight = 32;
     const eventRowHeight = 22;
+    const moreIndicatorHeight = 16;
 
     const contentHeight = compactMaxHeight - dayHeaderRowHeight - (weekRows * gridGap);
     const dayCellHeight = Math.floor(contentHeight / weekRows);
-    const usableEventHeight = dayCellHeight - verticalPadding - dayNumberHeight;
+    const usableEventHeight = dayCellHeight - verticalPadding - dayNumberHeight - moreIndicatorHeight;
     if (!Number.isFinite(usableEventHeight) || usableEventHeight <= 0) {
       return 1;
     }
@@ -3266,16 +3281,19 @@ class SkylightCalendarCard extends HTMLElement {
     dayEvents = this.sortEventsForDate(dayEvents, date);
     
     const maxVisible = this.getMaxVisibleEventsForMonthDay();
-    
+    const hasOverflow = dayEvents.length > maxVisible;
+    const visibleEvents = hasOverflow ? Math.max(0, maxVisible - 1) : maxVisible;
+    const hiddenEventCount = Math.max(0, dayEvents.length - visibleEvents);
+
     let classes = 'day-cell';
     if (isOtherMonth) classes += ' other-month';
     if (isToday) classes += ' today';
-    
+
     return `
       <div class="${classes}" data-date="${date.toISOString()}">
         <div class="day-number">${dayNum}</div>
-        ${dayEvents.slice(0, maxVisible).map(event => this.renderEvent(event, date)).join('')}
-        ${dayEvents.length > maxVisible ? `<div class="more-events">${this.t('moreEvents', { count: dayEvents.length - maxVisible })}</div>` : ''}
+        ${dayEvents.slice(0, visibleEvents).map(event => this.renderEvent(event, date)).join('')}
+        ${hiddenEventCount > 0 ? `<div class="more-events" data-click-target="more-events">${this.t('moreEvents', { count: hiddenEventCount })}</div>` : ''}
       </div>
     `;
   }
@@ -3483,6 +3501,22 @@ class SkylightCalendarCard extends HTMLElement {
       });
     });
     
+    // +N more click handlers (month view)
+    this.shadowRoot.querySelectorAll('.more-events').forEach(moreEl => {
+      moreEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const dayEl = moreEl.closest('.day-cell');
+        if (!dayEl) return;
+
+        const date = new Date(dayEl.getAttribute('data-date'));
+        const events = this.getEventsForDay(date);
+
+        if (events.length > 0) {
+          this.showDayCompactModal(date, events);
+        }
+      });
+    });
+
     // Day click handlers (month view only)
     this.shadowRoot.querySelectorAll('.day-cell').forEach(dayEl => {
       dayEl.addEventListener('click', (e) => {
@@ -3542,7 +3576,13 @@ class SkylightCalendarCard extends HTMLElement {
     // Modal close
     modal?.addEventListener('click', (e) => {
       if (e.target === modal) {
-        modal.classList.remove('show');
+        if (this._activeModalBackHandler) {
+          const backHandler = this._activeModalBackHandler;
+          this._activeModalBackHandler = null;
+          backHandler();
+        } else {
+          modal.classList.remove('show');
+        }
       }
     });
   }
@@ -4910,7 +4950,11 @@ class SkylightCalendarCard extends HTMLElement {
     // Could add a toast notification here
   }
 
-  showEventModal(event) {
+  setModalBackHandler(onCloseBack = null) {
+    this._activeModalBackHandler = typeof onCloseBack === 'function' ? onCloseBack : null;
+  }
+
+  showEventModal(event, onCloseBack = null) {
     const modal = this.shadowRoot.getElementById('event-modal');
     const content = this.shadowRoot.getElementById('modal-content');
     
@@ -5037,22 +5081,82 @@ class SkylightCalendarCard extends HTMLElement {
     `;
     
     modal.classList.add('show');
-    
+    this.setModalBackHandler(onCloseBack);
+
     // Close button
     this.shadowRoot.getElementById('close-modal')?.addEventListener('click', () => {
-      modal.classList.remove('show');
+      if (this._activeModalBackHandler) {
+        const backHandler = this._activeModalBackHandler;
+        this._activeModalBackHandler = null;
+        backHandler();
+      } else {
+        modal.classList.remove('show');
+      }
     });
     
     // Edit button
     this.shadowRoot.getElementById('edit-event-btn')?.addEventListener('click', () => {
+      this._activeModalBackHandler = null;
       modal.classList.remove('show');
       this.showEditConfirmation(event, startDate, endDate, isAllDay);
     });
     
     // Delete button
     this.shadowRoot.getElementById('delete-event-btn')?.addEventListener('click', () => {
+      this._activeModalBackHandler = null;
       modal.classList.remove('show');
       this.showDeleteConfirmation(event);
+    });
+  }
+
+  showDayCompactModal(date, events) {
+    const modal = this.shadowRoot.getElementById('event-modal');
+    const content = this.shadowRoot.getElementById('modal-content');
+
+    const sortedEvents = this.sortEventsForDate(events, date);
+
+    content.innerHTML = `
+      <div class="modal-header">
+        <h3 class="modal-title">${this.formatDate(date)}</h3>
+        <button class="modal-close" id="close-modal">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="week-compact-container single-day-modal">
+          <div class="week-day-column">
+            <div class="week-day-header">
+              <div class="week-day-name">${this.getWeekdayNames('short')[date.getDay()]}</div>
+              <div class="week-day-date">${date.getDate()}</div>
+            </div>
+            ${sortedEvents.length > 0 ? sortedEvents.map(event => {
+              const daySegment = this.getEventDaySegment(event, date);
+              if (!daySegment) return '';
+              const { segmentStart, isAllDaySegment } = daySegment;
+              const timeLabel = isAllDaySegment ? this.t('allDay') : this.formatTime(segmentStart);
+              return `
+                <div class="week-compact-event" style="background: ${event.color}" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
+                  <div class="week-compact-event-time">${timeLabel}</div>
+                  <div class="week-compact-event-title">${this.escapeHtml(event.summary || this.t('untitledEvent'))}</div>
+                </div>
+              `;
+            }).join('') : `<div class="empty-state-subtext">${this.t('noEvents')}</div>`}
+          </div>
+        </div>
+      </div>
+    `;
+
+    modal.classList.add('show');
+    this._activeModalBackHandler = null;
+
+    this.shadowRoot.getElementById('close-modal')?.addEventListener('click', () => {
+      this._activeModalBackHandler = null;
+      modal.classList.remove('show');
+    });
+
+    this.shadowRoot.querySelectorAll('.week-compact-event').forEach(el => {
+      el.addEventListener('click', () => {
+        const eventData = JSON.parse(el.getAttribute('data-event'));
+        this.showEventModal(eventData, () => this.showDayCompactModal(date, events));
+      });
     });
   }
 
@@ -5088,8 +5192,10 @@ class SkylightCalendarCard extends HTMLElement {
     `;
     
     modal.classList.add('show');
-    
+    this._activeModalBackHandler = null;
+
     this.shadowRoot.getElementById('close-modal')?.addEventListener('click', () => {
+      this._activeModalBackHandler = null;
       modal.classList.remove('show');
     });
     
