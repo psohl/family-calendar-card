@@ -10,17 +10,20 @@ assignees: ''
 **Describe the bug**
 A clear and concise description of what the bug is.
 
-**Dashboard Version**
-What version are you running?
-
-**Home Assistant Version**
-What version are you running?
+**View(s) containing the bug**
+Describe which view(s) contain the bug. If the bug occurs when switching between views, describe how you recreate it.
 
 **Complete card yaml configuration**
 A clear and concise description of what you expected to happen.
 
 **Screenshots**
 Screenshots help.
+
+**Dashboard Version**
+What version are you running?
+
+**Home Assistant Version**
+What version are you running?
 
 **Additional context**
 Add any other context about the problem here.
