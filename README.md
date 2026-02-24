@@ -18,9 +18,11 @@ This card requires one or more **Home Assistant calendar entities** (for example
 
 Install with **HACS** (recommended):
 
-1. Open HACS → **Frontend**
-2. Search for **Skylight Calendar Card**
-3. Download and restart Home Assistant
+1. Open HACS
+2. Click the 3 dots in the top right of the window
+3. Select Custom repository
+4. Search for Repository: https://github.com/superdingo101/skylight-calendar-card, Type: Dashboard
+5. Download and refresh Home Assistant frontend
 
 Or install manually by copying `skylight-calendar-card.js` to `/config/www/` and adding it as a Lovelace resource.
 
@@ -34,28 +36,6 @@ title: Family Calendar
 entities:
   - calendar.family
 ```
-
-
-### Background customization (transparent or image)
-
-You can make the calendar background transparent, or set a background image URL that applies across month, week, and schedule views:
-
-```yaml
-type: custom:skylight-calendar-card
-entities:
-  - calendar.family
-background_transparent: true
-# or use an image instead:
-# background_image_url: https://example.com/your-photo.jpg
-# background_image_size: cover
-# background_image_position: center
-# background_image_repeat: no-repeat
-```
-
-`background_image_url` supports:
-- Online images (for example `https://...`)
-- Home Assistant local media paths (for example `/media/local/family/photo.jpg`)
-- Home Assistant media-source local URIs (for example `media-source://media_source/local/family/photo.jpg`)
 
 ## Documentation Wiki
 
