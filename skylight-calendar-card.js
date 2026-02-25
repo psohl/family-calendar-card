@@ -472,6 +472,7 @@ class SkylightCalendarCard extends HTMLElement {
       }
 
       this.updateCompactHeaderWrapState();
+      this.updateCalendarBadgesScrollState();
     };
   }
 
@@ -578,6 +579,24 @@ class SkylightCalendarCard extends HTMLElement {
     const firstBadgeTop = visibleBadges[0].offsetTop;
     const badgesWrapped = visibleBadges.some((child) => Math.abs(child.offsetTop - firstBadgeTop) > 1);
     badges.classList.toggle('is-wrapped', badgesWrapped);
+  }
+
+
+  updateCalendarBadgesScrollState() {
+    if (!this.shadowRoot || this._config.compact_header) return;
+
+    const badgesContainer = this.shadowRoot.querySelector('.calendar-badges-container');
+    const badges = this.shadowRoot.querySelector('.calendar-badges');
+    if (!badgesContainer || !badges) return;
+
+    const maxScrollLeft = badges.scrollWidth - badges.clientWidth;
+    const hasOverflow = maxScrollLeft > 1;
+    const showLeftIndicator = hasOverflow && badges.scrollLeft > 1;
+    const showRightIndicator = hasOverflow && badges.scrollLeft < (maxScrollLeft - 1);
+
+    badgesContainer.classList.toggle('has-overflow', hasOverflow);
+    badgesContainer.classList.toggle('show-left-indicator', showLeftIndicator);
+    badgesContainer.classList.toggle('show-right-indicator', showRightIndicator);
   }
 
   isEventManagementDialogOpen() {
@@ -1586,18 +1605,92 @@ class SkylightCalendarCard extends HTMLElement {
       }
       
       /* Week Standard View Styles */
+
+      .calendar-badges-container {
+        position: relative;
+      }
+
       .calendar-badges {
         padding: 16px 24px;
         display: flex;
         gap: 12px;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
         background: white;
         border-bottom: 1px solid #e5e7eb;
+      }
+
+      .calendar-badges-container.has-overflow::after,
+      .calendar-badges-container.has-overflow::before {
+        position: absolute;
+        top: 0;
+        bottom: 1px;
+        width: 44px;
+        pointer-events: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        font-weight: 800;
+        text-shadow: 0 0 8px rgba(255, 255, 255, 0.85);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+
+      .calendar-badges-container.has-overflow::after {
+        content: '»';
+        right: 0;
+        color: rgba(17, 24, 39, 0.85);
+        background: linear-gradient(to left, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0));
+      }
+
+      .calendar-badges-container.has-overflow::before {
+        content: '«';
+        left: 0;
+        color: rgba(17, 24, 39, 0.75);
+        background: linear-gradient(to right, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0));
+      }
+
+      .calendar-badges-container.show-right-indicator::after,
+      .calendar-badges-container.show-left-indicator::before {
+        opacity: 1;
+      }
+
+      .calendar-badges-container.show-right-indicator::after {
+        animation: badges-overflow-nudge-right 1.2s ease-in-out infinite;
+      }
+
+      .calendar-badges-container.show-left-indicator::before {
+        animation: badges-overflow-nudge-left 1.2s ease-in-out infinite;
+      }
+
+      @keyframes badges-overflow-nudge-right {
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        50% {
+          transform: translateX(3px);
+        }
+      }
+
+      @keyframes badges-overflow-nudge-left {
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        50% {
+          transform: translateX(-3px);
+        }
       }
       
       .calendar-badge {
         display: inline-flex;
         align-items: center;
+        flex: 0 0 auto;
         gap: 8px;
         padding: 8px 16px;
         border-radius: 20px;
@@ -2334,6 +2427,19 @@ class SkylightCalendarCard extends HTMLElement {
         border-color: #4b5563;
       }
 
+      .calendar-container.dark-mode .calendar-badges-container.has-overflow::after {
+        color: rgba(248, 250, 252, 0.95);
+        text-shadow: 0 0 10px rgba(17, 24, 39, 0.75);
+        background: linear-gradient(to left, rgba(48, 54, 63, 1), rgba(48, 54, 63, 0));
+      }
+
+      .calendar-container.dark-mode .calendar-badges-container.has-overflow::before {
+        color: rgba(248, 250, 252, 0.9);
+        text-shadow: 0 0 10px rgba(17, 24, 39, 0.75);
+        background: linear-gradient(to right, rgba(48, 54, 63, 1), rgba(48, 54, 63, 0));
+      }
+
+
       .calendar-container.dark-mode .day-cell,
       .calendar-container.dark-mode .week-day-column,
       .calendar-container.dark-mode .week-day-header,
@@ -2526,6 +2632,12 @@ class SkylightCalendarCard extends HTMLElement {
         border-color: rgba(255, 255, 255, 0.35) !important;
       }
 
+      .calendar-container.custom-background .calendar-badges-container.has-overflow::after,
+      .calendar-container.custom-background .calendar-badges-container.has-overflow::before {
+        display: none;
+      }
+
+
       .calendar-container.custom-background .day-cell.other-month {
         background: rgba(255, 255, 255, 0.12) !important;
       }
@@ -2619,6 +2731,7 @@ class SkylightCalendarCard extends HTMLElement {
 
     this.attachEventListeners();
     this.updateCompactHeaderWrapState();
+    this.updateCalendarBadgesScrollState();
     this.updateWeekStandardFixedOffsetHeightFromDom();
     this.updateMonthContainerTopInViewportFromDom();
   }
@@ -2924,24 +3037,26 @@ class SkylightCalendarCard extends HTMLElement {
     if (!this._config.entities || this._config.entities.length === 0) return '';
     
     return `
-      <div class="calendar-badges">
-        ${this._config.entities.map((entityId, index) => {
-          const name = this.getCalendarName(entityId);
-          const color = this._config.colors[entityId] || this.getDefaultColor(index);
-          const initial = name.charAt(0).toUpperCase();
-          const isHidden = this._hiddenCalendars.has(entityId);
-          
-          return `
-            <div class="calendar-badge ${isHidden ? 'calendar-badge-hidden' : ''}" 
-                 data-entity="${entityId}"
-                 style="background: ${isHidden ? '#f3f4f6' : this.lightenColor(color, 0.85)}; 
-                        border-color: ${isHidden ? '#d1d5db' : color};
-                        cursor: pointer;">
-              <div class="calendar-badge-icon" style="background: ${isHidden ? '#9ca3af' : color}">${initial}</div>
-              <span class="calendar-badge-name" style="color: ${isHidden ? '#9ca3af' : '#374151'}">${this.escapeHtml(name)}</span>
-            </div>
-          `;
-        }).join('')}
+      <div class="calendar-badges-container">
+        <div class="calendar-badges">
+          ${this._config.entities.map((entityId, index) => {
+            const name = this.getCalendarName(entityId);
+            const color = this._config.colors[entityId] || this.getDefaultColor(index);
+            const initial = name.charAt(0).toUpperCase();
+            const isHidden = this._hiddenCalendars.has(entityId);
+            
+            return `
+              <div class="calendar-badge ${isHidden ? 'calendar-badge-hidden' : ''}" 
+                   data-entity="${entityId}"
+                   style="background: ${isHidden ? '#f3f4f6' : this.lightenColor(color, 0.85)}; 
+                          border-color: ${isHidden ? '#d1d5db' : color};
+                          cursor: pointer;">
+                <div class="calendar-badge-icon" style="background: ${isHidden ? '#9ca3af' : color}">${initial}</div>
+                <span class="calendar-badge-name" style="color: ${isHidden ? '#9ca3af' : '#374151'}">${this.escapeHtml(name)}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
       </div>
     `;
   }
@@ -3422,6 +3537,11 @@ class SkylightCalendarCard extends HTMLElement {
       });
     });
     
+    const calendarBadgesStrip = this.shadowRoot.querySelector('.calendar-badges');
+    if (calendarBadgesStrip) {
+      calendarBadgesStrip.addEventListener('scroll', () => this.updateCalendarBadgesScrollState(), { passive: true });
+    }
+
     // Calendar badge toggle (both regular and inline)
     this.shadowRoot.querySelectorAll('.calendar-badge, .calendar-badge-inline').forEach(badge => {
       badge.addEventListener('click', (e) => {
