@@ -541,21 +541,23 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   updateCompactHeaderWrapState() {
-    if (!this.shadowRoot || !this._config.compact_header) return;
+    if (!this.shadowRoot) return;
 
-    const compactHeader = this.shadowRoot.querySelector('.header-compact');
-    if (compactHeader) {
-      const topLevelChildren = Array.from(compactHeader.children).filter((child) => child.offsetParent !== null);
+    const headerSelector = this._config.compact_header ? '.header-compact' : '.header';
+    const header = this.shadowRoot.querySelector(headerSelector);
+    if (header) {
+      const topLevelChildren = Array.from(header.children).filter((child) => child.offsetParent !== null);
       if (topLevelChildren.length <= 1) {
-        compactHeader.classList.remove('is-wrapped');
+        header.classList.remove('is-wrapped');
       } else {
         const firstTop = topLevelChildren[0].offsetTop;
         const headerWrapped = topLevelChildren.some((child) => Math.abs(child.offsetTop - firstTop) > 1);
-        compactHeader.classList.toggle('is-wrapped', headerWrapped);
+        header.classList.toggle('is-wrapped', headerWrapped);
       }
     }
 
-    const controls = this.shadowRoot.querySelector('.compact-header-controls');
+    const controlsSelector = this._config.compact_header ? '.compact-header-controls' : '.header-controls';
+    const controls = this.shadowRoot.querySelector(controlsSelector);
     if (controls) {
       const visibleChildren = Array.from(controls.children).filter((child) => child.offsetParent !== null);
       if (visibleChildren.length <= 1) {
@@ -566,6 +568,8 @@ class SkylightCalendarCard extends HTMLElement {
         controls.classList.toggle('is-wrapped', isWrapped);
       }
     }
+
+    if (!this._config.compact_header) return;
 
     const badges = this.shadowRoot.querySelector('.calendar-badges-inline');
     if (!badges) return;
@@ -619,8 +623,7 @@ class SkylightCalendarCard extends HTMLElement {
       colors: config.colors || {},
       calendar_names: config.calendar_names || {}, // Map entity IDs to friendly names
       maxEvents: config.max_events || 100,
-      view_mode: config.view_mode || 'month', // 'month', 'week-compact', 'week-standard'
-      default_view: config.default_view || config.view_mode || 'month', // Default view on load
+      default_view: config.default_view || 'month', // Default view on load
       week_days: config.week_days || [0, 1, 2, 3, 4, 5, 6], // Which days to show in week view
       rolling_days_week_compact: config.rolling_days_week_compact ?? null, // If set, compact week view shows current day + N days instead of week_days
       rolling_days_schedule: config.rolling_days_schedule ?? null, // If set, schedule week view shows current day + N days instead of week_days
@@ -1205,6 +1208,16 @@ class SkylightCalendarCard extends HTMLElement {
         justify-content: center;
       }
       
+      .header.is-wrapped .header-left,
+      .header.is-wrapped .header-controls {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .header-controls.is-wrapped .period-controls {
+        margin-left: 0;
+      }
+
       .calendar-badges-inline {
         display: flex;
         gap: 8px;
@@ -1236,34 +1249,32 @@ class SkylightCalendarCard extends HTMLElement {
         margin: 0;
       }
       
-      .add-event-button {
-        background: rgba(255, 255, 255, 0.25);
-        border: 2px solid rgba(255, 255, 255, 0.4);
+      .add-event-button,
+      .compact-add-event-button {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
         color: white;
-        padding: 8px 20px;
+        padding: 8px 16px;
         border-radius: 8px;
         cursor: pointer;
-        font-size: 14px;
-        font-weight: 600;
-        display: flex;
+        font-size: 13px;
+        font-weight: 500;
+        display: inline-flex;
         align-items: center;
         gap: 8px;
-        transition: all 0.2s;
+        transition: background 0.2s;
       }
       
-      .add-event-button:hover {
-        background: rgba(255, 255, 255, 0.35);
+      .add-event-button:hover,
+      .compact-add-event-button:hover {
+        background: rgba(255, 255, 255, 0.3);
         border-color: rgba(255, 255, 255, 0.6);
-        transform: translateY(-1px);
+        transform: none;
       }
       
-      .add-event-button:active {
-        transform: translateY(0);
-      }
-      
-      .add-event-button .icon {
-        font-size: 18px;
-        font-weight: bold;
+      .add-event-button .icon,
+      .compact-add-event-button .icon {
+        font-size: 14px;
       }
       
       .header-controls {
@@ -1277,6 +1288,7 @@ class SkylightCalendarCard extends HTMLElement {
         justify-content: flex-end;
       }
 
+      .period-controls,
       .compact-period-controls {
         display: flex;
         align-items: center;
@@ -1285,8 +1297,13 @@ class SkylightCalendarCard extends HTMLElement {
         margin-left: auto;
       }
 
+      .period-controls .month-year,
       .compact-period-controls .month-year {
         min-width: auto;
+      }
+
+      .header-controls.is-wrapped {
+        justify-content: center;
       }
 
       .compact-header-controls.is-wrapped {
@@ -1381,28 +1398,6 @@ class SkylightCalendarCard extends HTMLElement {
         border-color: rgba(255, 255, 255, 0.6);
       }
 
-      .compact-add-event-button {
-        background: rgba(255, 255, 255, 0.2);
-        border: none;
-        color: white;
-        padding: 8px 16px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 13px;
-        font-weight: 500;
-        transition: background 0.2s;
-      }
-
-      .compact-add-event-button:hover {
-        background: rgba(255, 255, 255, 0.3);
-        border-color: rgba(255, 255, 255, 0.6);
-        transform: none;
-      }
-
-      .compact-add-event-button .icon {
-        font-size: 14px;
-      }
-      
       .month-year {
         font-size: 18px;
         font-weight: 500;
@@ -2582,6 +2577,8 @@ class SkylightCalendarCard extends HTMLElement {
       }
 
       .calendar-container.dark-mode .view-mode-buttons,
+      .calendar-container.dark-mode .add-event-button,
+      .calendar-container.dark-mode .compact-add-event-button,
       .calendar-container.dark-mode .nav-button,
       .calendar-container.dark-mode .today-button,
       .calendar-container.dark-mode .theme-toggle {
@@ -2660,6 +2657,7 @@ class SkylightCalendarCard extends HTMLElement {
           justify-content: flex-start;
         }
 
+        .period-controls,
         .compact-period-controls {
           width: 100%;
           justify-content: space-between;
@@ -2667,6 +2665,7 @@ class SkylightCalendarCard extends HTMLElement {
           margin-left: 0;
         }
 
+        .period-controls .month-year,
         .compact-period-controls .month-year {
           flex: 1;
           text-align: center;
@@ -2744,15 +2743,17 @@ class SkylightCalendarCard extends HTMLElement {
       <div class="header">
         <div class="header-left">
           <h2 class="header-title">${this._config.title}</h2>
-          ${canAddEvents ? `<button class="add-event-button" id="add-event-btn"><span class="icon">+</span>${this.t('addEvent')}</button>` : ''}
         </div>
         <div class="header-controls">
+          ${canAddEvents ? `<button class="add-event-button" id="add-event-btn"><span class="icon">+</span>${this.t('addEvent')}</button>` : ''}
           ${this.renderThemeToggle()}
           ${this.renderViewModeButtons()}
-          <button class="nav-button" id="prev-period">‹</button>
-          <div class="month-year">${this.getPeriodLabel()}</div>
-          <button class="nav-button" id="next-period">›</button>
-          <button class="today-button" id="today">${this.t('today')}</button>
+          <div class="period-controls">
+            <button class="nav-button" id="prev-period">‹</button>
+            <div class="month-year">${this.getPeriodLabel()}</div>
+            <button class="nav-button" id="next-period">›</button>
+            <button class="today-button" id="today">${this.t('today')}</button>
+          </div>
         </div>
       </div>
     `;
@@ -3531,7 +3532,6 @@ class SkylightCalendarCard extends HTMLElement {
     this.shadowRoot.querySelectorAll('.view-mode-button').forEach(button => {
       button.addEventListener('click', () => {
         this._viewMode = button.getAttribute('data-view');
-        this._config.view_mode = this._viewMode;
         this.setWeekStart();
         this.ensureEventsForCurrentRange({ renderIfCovered: true });
       });
@@ -5423,7 +5423,7 @@ class SkylightCalendarCard extends HTMLElement {
     return {
       title: 'Family Calendar',
       entities: ['calendar.personal'],
-      view_mode: 'month',
+      default_view: 'month',
       show_week_numbers: false,
       first_day_of_week: 0,
       week_days: [0, 1, 2, 3, 4, 5, 6],
