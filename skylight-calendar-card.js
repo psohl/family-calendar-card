@@ -3415,8 +3415,10 @@ class SkylightCalendarCard extends HTMLElement {
       const date = new Date(weekStart);
       date.setDate(weekStart.getDate() + i);
       
-      // Check if this day is in a different month than the reference date (for styling)
-      const isOtherMonth = date.getMonth() !== this._currentDate.getMonth();
+      // In rolling-weeks month view, keep trailing (next-month) days visually active
+      // while still dimming any leading days from the previous month.
+      const currentMonthStart = new Date(this._currentDate.getFullYear(), this._currentDate.getMonth(), 1);
+      const isOtherMonth = date < currentMonthStart;
       
       html += this.renderDay(date.getDate(), date, isOtherMonth);
     }
