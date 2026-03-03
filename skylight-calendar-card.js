@@ -617,6 +617,8 @@ class SkylightCalendarCard extends HTMLElement {
     const language = resolveLanguage(config.language || this._hass?.language || this._hass?.locale?.language);
     this._hasCustomTitle = config.title !== undefined && config.title !== null;
     const previousHiddenCalendars = new Set(this._hiddenCalendars);
+    const configuredMaxEvents = Number(config.max_events);
+
     this._config = {
       title: this._hasCustomTitle ? config.title : translate(language, 'defaultTitle'),
       entities: config.entities,
@@ -624,7 +626,7 @@ class SkylightCalendarCard extends HTMLElement {
       firstDayOfWeek: config.first_day_of_week || 0, // 0 = Sunday
       colors: config.colors || {},
       calendar_names: config.calendar_names || {}, // Map entity IDs to friendly names
-      maxEvents: config.max_events || 100,
+      maxEvents: Number.isFinite(configuredMaxEvents) && configuredMaxEvents >= 0 ? configuredMaxEvents : 0,
       default_view: config.default_view || 'month', // Default view on load
       week_days: config.week_days || [0, 1, 2, 3, 4, 5, 6], // Which days to show in week view
       rolling_days_week_compact: config.rolling_days_week_compact ?? null, // If set, compact week view shows current day + N days instead of week_days
@@ -808,7 +810,15 @@ class SkylightCalendarCard extends HTMLElement {
 
     const merged = Array.from(mergedByKey.values());
     merged.sort((a, b) => this.getEventStartDate(a) - this.getEventStartDate(b));
-    return merged.slice(0, this._config.maxEvents);
+    return this.limitEvents(merged);
+  }
+
+  limitEvents(events) {
+    if (this._config.maxEvents === 0) {
+      return events;
+    }
+
+    return events.slice(0, this._config.maxEvents);
   }
 
   async updateEvents() {
@@ -821,7 +831,7 @@ class SkylightCalendarCard extends HTMLElement {
     try {
       const newEvents = await this.fetchEventsInRange(startDate, endDate);
       newEvents.sort((a, b) => this.getEventStartDate(a) - this.getEventStartDate(b));
-      this._events = newEvents.slice(0, this._config.maxEvents);
+      this._events = this.limitEvents(newEvents);
       this._loadedEventRange = { startDate, endDate };
       this.render();
     } finally {
