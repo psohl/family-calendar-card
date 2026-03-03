@@ -784,8 +784,8 @@ class SkylightCalendarCard extends HTMLElement {
       // WebSocket API might not be available in older HA versions or for some integrations
       // Try REST API fallback without logging (this is expected)
       try {
-        const startDateOnly = chunk.startDate.toISOString().split('T')[0];
-        const endDateOnly = chunk.endDate.toISOString().split('T')[0];
+        const startDateOnly = this.formatLocalDate(chunk.startDate);
+        const endDateOnly = this.formatLocalDate(chunk.endDate);
         return await this._hass.callApi('GET', `calendars/${entityId}?start=${startDateOnly}T00:00:00Z&end=${endDateOnly}T23:59:59Z`);
       } catch (error2) {
         // Both methods failed - this is a real error
@@ -991,8 +991,43 @@ class SkylightCalendarCard extends HTMLElement {
 
   getEventStartDate(event) {
     if (event.start?.dateTime) return new Date(event.start.dateTime);
-    if (event.start?.date) return new Date(`${event.start.date}T00:00:00`);
+    if (event.start?.date) return this.parseLocalDate(event.start.date);
     return new Date(event.start);
+  }
+
+  parseLocalDate(dateStr) {
+    if (!dateStr || typeof dateStr !== 'string') return new Date(dateStr);
+    const [year, month, day] = dateStr.split('-').map(Number);
+    if (![year, month, day].every(Number.isFinite)) return new Date(dateStr);
+    return new Date(year, month - 1, day);
+  }
+
+  parsePossiblyLocalDateTime(value) {
+    if (!value || typeof value !== 'string') return new Date(value);
+
+    const hasTimezone = /(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(value);
+    if (hasTimezone) return new Date(value);
+
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (!match) return new Date(value);
+
+    const [, year, month, day, hour, minute, second = '0'] = match;
+    return new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second)
+    );
+  }
+
+  formatLocalDate(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   getDefaultColor(index) {
@@ -3681,8 +3716,8 @@ class SkylightCalendarCard extends HTMLElement {
 
     if (event.start.date) {
       return {
-        eventStart: new Date(event.start.date + 'T00:00:00'),
-        eventEnd: new Date(event.end.date + 'T00:00:00'),
+        eventStart: this.parseLocalDate(event.start.date),
+        eventEnd: this.parseLocalDate(event.end.date),
         isAllDay: true
       };
     }
@@ -4069,7 +4104,7 @@ class SkylightCalendarCard extends HTMLElement {
 
     const toDate = (value) => {
       if (!value) return null;
-      return isDateOnly ? new Date(`${value}T00:00:00`) : new Date(value);
+      return isDateOnly ? this.parseLocalDate(value) : this.parsePossiblyLocalDateTime(value);
     };
 
     const fromDate = (date) => {
@@ -4405,8 +4440,8 @@ class SkylightCalendarCard extends HTMLElement {
         }
         
         // Validate that end date is on or after start date
-        const start = new Date(startDate);
-        const end = new Date(endDate);
+        const start = this.parseLocalDate(startDate);
+        const end = this.parseLocalDate(endDate);
         
         if (end < start) {
           this.showFormError(errorDiv, this.t('endDateBeforeStart'));
@@ -4416,7 +4451,7 @@ class SkylightCalendarCard extends HTMLElement {
         // For Home Assistant, end date is exclusive, so add 1 day
         const exclusiveEndDate = new Date(end);
         exclusiveEndDate.setDate(exclusiveEndDate.getDate() + 1);
-        const exclusiveEndDateStr = exclusiveEndDate.toISOString().split('T')[0];
+        const exclusiveEndDateStr = this.formatLocalDate(exclusiveEndDate);
         
         eventData.start = { date: startDate };
         eventData.end = { date: exclusiveEndDateStr };
@@ -4430,8 +4465,8 @@ class SkylightCalendarCard extends HTMLElement {
         }
         
         // Convert to ISO format
-        const start = new Date(startDateTime);
-        const end = new Date(endDateTime);
+        const start = this.parsePossiblyLocalDateTime(startDateTime);
+        const end = this.parsePossiblyLocalDateTime(endDateTime);
         
         if (end <= start) {
           this.showFormError(errorDiv, this.t('endTimeBeforeStart'));
@@ -4773,8 +4808,8 @@ class SkylightCalendarCard extends HTMLElement {
         }
         
         // Validate that end date is on or after start date
-        const start = new Date(startDateStr);
-        const end = new Date(endDateStr);
+        const start = this.parseLocalDate(startDateStr);
+        const end = this.parseLocalDate(endDateStr);
         
         if (end < start) {
           this.showFormError(errorDiv, this.t('endDateBeforeStart'));
@@ -4784,7 +4819,7 @@ class SkylightCalendarCard extends HTMLElement {
         // For Home Assistant, end date is exclusive, so add 1 day
         const exclusiveEndDate = new Date(end);
         exclusiveEndDate.setDate(exclusiveEndDate.getDate() + 1);
-        const exclusiveEndDateStr = exclusiveEndDate.toISOString().split('T')[0];
+        const exclusiveEndDateStr = this.formatLocalDate(exclusiveEndDate);
         
         eventData.start = { date: startDateStr };
         eventData.end = { date: exclusiveEndDateStr };
@@ -4798,8 +4833,8 @@ class SkylightCalendarCard extends HTMLElement {
         }
         
         // Convert to ISO format
-        const start = new Date(startDateTime);
-        const end = new Date(endDateTime);
+        const start = this.parsePossiblyLocalDateTime(startDateTime);
+        const end = this.parsePossiblyLocalDateTime(endDateTime);
         
         if (end <= start) {
           this.showFormError(errorDiv, this.t('endTimeBeforeStart'));
@@ -5508,8 +5543,8 @@ class SkylightCalendarCard extends HTMLElement {
       isAllDay = false;
     } else if (event.start.date) {
       // For all-day events, add T00:00:00 to prevent timezone shifts
-      startDate = new Date(event.start.date + 'T00:00:00');
-      endDate = new Date(event.end.date + 'T00:00:00');
+      startDate = this.parseLocalDate(event.start.date);
+      endDate = this.parseLocalDate(event.end.date);
       
       // End date is exclusive for all-day events, so subtract 1 day for display
       endDate.setDate(endDate.getDate() - 1);
