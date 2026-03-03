@@ -461,6 +461,8 @@ class SkylightCalendarCard extends HTMLElement {
     this._weekStandardContainerTopInViewport = null;
     this._monthContainerTopInViewport = null;
     this._activeModalBackHandler = null;
+    this._combinedEditTargets = null;
+    this._combinedDeleteTargets = null;
     this._handleViewportResize = () => {
       if (this.isEventManagementDialogOpen()) {
         return;
@@ -645,6 +647,8 @@ class SkylightCalendarCard extends HTMLElement {
       background_image_size: config.background_image_size || 'cover', // CSS background-size for calendar image
       background_image_position: config.background_image_position || 'center', // CSS background-position for calendar image
       background_image_repeat: config.background_image_repeat || 'no-repeat', // CSS background-repeat for calendar image
+      combine_calendars: config.combine_calendars ?? false, // Combine exact duplicate events across calendars with zebra striping
+      combine_calendars_width: config.combine_calendars_width ?? 12, // Stripe width in pixels for combined calendar zebra styling
       enable_event_management: config.enable_event_management !== false, // Enable create/edit/delete
       readonly_calendars: config.readonly_calendars || [], // Calendars that should not allow modifications
       language: config.language || null, // Language code for translations (e.g., 'en', 'de', 'fr')
@@ -1920,17 +1924,22 @@ class SkylightCalendarCard extends HTMLElement {
         opacity: 0.85;
       }
       
+      .week-standard-event-icons {
+        display: flex;
+        justify-content: flex-end;
+        gap: 4px;
+        margin-top: 4px;
+      }
+
       .week-standard-event-icon {
         width: 20px;
         height: 20px;
         border-radius: 50%;
-        background: rgba(255, 255, 255, 0.9);
         display: inline-flex;
         align-items: center;
         justify-content: center;
         font-size: 10px;
-        float: right;
-        margin-left: 8px;
+        flex-shrink: 0;
       }
 
       .current-time-line {
@@ -2934,9 +2943,10 @@ class SkylightCalendarCard extends HTMLElement {
                   const timeLabel = isAllDaySegment
                     ? this.t('allDay')
                     : `${this.formatTime(segmentStart)} - ${this.formatTime(segmentEnd)}`;
+                  const eventStyle = this.getEventStyle(event);
                   
                   return `
-                    <div class="week-compact-event" style="background: ${event.color}; --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
+                    <div class="week-compact-event" style="${eventStyle} --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
                       <div class="week-compact-event-time">${timeLabel}</div>
                       <div class="week-compact-event-title">${this.escapeHtml(event.summary || this.t('untitledEvent'))}</div>
                     </div>
@@ -2973,7 +2983,6 @@ class SkylightCalendarCard extends HTMLElement {
     weekDays.forEach(date => {
       const dayEvents = this.getEventsForDay(date);
       const allDayCount = dayEvents.filter(event => {
-        if (this._hiddenCalendars.has(event.entityId)) return false;
         const daySegment = this.getEventDaySegment(event, date);
         return daySegment ? daySegment.isAllDaySegment : false;
       }).length;
@@ -3079,10 +3088,10 @@ class SkylightCalendarCard extends HTMLElement {
     return `
       <div class="all-day-events" style="min-height: ${allDayHeight}px; height: ${allDayHeight}px;">
         ${allDayEvents.length > 0 ? allDayEvents.map(event => {
-          const bgColor = event.color;
+          const eventStyle = this.getEventStyle(event, { withBorderAccent: false });
           return `
             <div class="all-day-event" 
-                 style="background: ${bgColor}; border-left: 4px solid ${event.color}; --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};"
+                 style="${eventStyle} --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};"
                  data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
               <div class="all-day-event-title">${this.escapeHtml(event.summary || this.t('untitledEvent'))}</div>
             </div>
@@ -3094,9 +3103,6 @@ class SkylightCalendarCard extends HTMLElement {
 
   renderTimedEventsForDay(events, date, startHour, endHour, hourHeight) {
     const timedEvents = events.map(event => {
-      if (this._hiddenCalendars.has(event.entityId)) {
-        return null;
-      }
       const daySegment = this.getEventDaySegment(event, date);
       if (!daySegment || daySegment.isAllDaySegment) {
         return null;
@@ -3202,11 +3208,11 @@ class SkylightCalendarCard extends HTMLElement {
       const width = clusterColumns > 1 ? `calc((100% - 16px) / ${clusterColumns})` : 'calc(100% - 16px)';
       const left = clusterColumns > 1 ? `calc(8px + ((100% - 16px) / ${clusterColumns}) * ${column})` : '8px';
       
-      const bgColor = event.color;
+      const eventStyle = this.getEventStyle(event, { withBorderAccent: true });
       
       return `
         <div class="week-standard-event" 
-             style="top: ${top}px; height: ${height}px; width: ${width}; left: ${left}; background: ${bgColor}; border-left: 4px solid ${event.color}; --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};"
+             style="top: ${top}px; height: ${height}px; width: ${width}; left: ${left}; ${eventStyle} --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};"
              data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
           <div class="week-standard-event-title">${this.escapeHtml(event.summary || this.t('untitledEvent'))}</div>
           ${this.shouldShowEventTime(event) ? `<div class="week-standard-event-time">${this.formatScheduleTime(eventStart)} - ${this.formatScheduleTime(eventEnd)}</div>` : ''}
@@ -3216,17 +3222,31 @@ class SkylightCalendarCard extends HTMLElement {
     }).join('');
   }
 
+  getVisibleCalendarBadgesForEvent(event) {
+    if (event.isCombinedCalendarEvent && Array.isArray(event.sourceCalendars)) {
+      return event.sourceCalendars.filter(calendar => !this._hiddenCalendars.has(calendar.entityId));
+    }
+
+    return [{ entityId: event.entityId, color: event.color }];
+  }
+
   renderEventIcon(event) {
     if (this._config.hide_event_calendar_bubble) {
       return '';
     }
 
-    // Get the initials or icon based on calendar
-    const entityId = event.entityId;
-    const name = this.getCalendarName(entityId);
-    const initial = name.charAt(0).toUpperCase();
-    
-    return `<div class="week-standard-event-icon" style="background: ${event.color}; color: white;">${initial}</div>`;
+    const visibleBadges = this.getVisibleCalendarBadgesForEvent(event);
+    if (visibleBadges.length === 0) {
+      return '';
+    }
+
+    const badgesHtml = visibleBadges.map(calendar => {
+      const name = this.getCalendarName(calendar.entityId);
+      const initial = name.charAt(0).toUpperCase();
+      return `<div class="week-standard-event-icon" style="background: ${calendar.color}; color: white;">${initial}</div>`;
+    }).join('');
+
+    return `<div class="week-standard-event-icons">${badgesHtml}</div>`;
   }
 
 
@@ -3261,15 +3281,31 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   getEventBubbleFontColor(event) {
-    const entityId = event?.entityId;
-    if (!entityId) return 'white';
-    const configuredColor = this._config?.event_font_colors?.[entityId];
+    if (!event) return 'white';
+
+    const visibleEntityIds = event.isCombinedCalendarEvent && Array.isArray(event.sourceEntityIds)
+      ? event.sourceEntityIds.filter(entityId => !this._hiddenCalendars.has(entityId))
+      : [event.entityId];
+
+    const preferredEntityId = visibleEntityIds[0] || event.entityId;
+    if (!preferredEntityId) return 'white';
+
+    const configuredColor = this._config?.event_font_colors?.[preferredEntityId];
     return configuredColor || 'white';
   }
 
   shouldShowEventTime(event) {
-    if (!event || !event.entityId) return true;
-    return !this._config.hide_times_for_calendars.includes(event.entityId);
+    if (!event) return true;
+
+    const visibleEntityIds = event.isCombinedCalendarEvent && Array.isArray(event.sourceEntityIds)
+      ? event.sourceEntityIds.filter(entityId => !this._hiddenCalendars.has(entityId))
+      : [event.entityId];
+
+    if (visibleEntityIds.length === 0) {
+      return false;
+    }
+
+    return visibleEntityIds.some(entityId => !this._config.hide_times_for_calendars.includes(entityId));
   }
 
   shouldShowCurrentTimeBar(today, startHour, endHour) {
@@ -3491,13 +3527,147 @@ class SkylightCalendarCard extends HTMLElement {
     const daySegment = this.getEventDaySegment(event, date);
     if (!daySegment) return '';
     const { segmentStart, isAllDaySegment } = daySegment;
+    const eventStyle = this.getEventStyle(event);
     
     return `
-      <div class="event" style="background: ${event.color}; --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
+      <div class="event" style="${eventStyle}; --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
         ${!isAllDaySegment ? `<span class="event-time">${this.formatTime(segmentStart)}</span>` : ''}
         ${this.escapeHtml(event.summary || this.t('untitledEvent'))}
       </div>
     `;
+  }
+
+  normalizeEventTextValue(value) {
+    return String(value || '')
+      .normalize('NFKC')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  getNormalizedEventTimeValue(value) {
+    if (!value) return '';
+
+    if (typeof value === 'object') {
+      if (value.dateTime) {
+        const ts = new Date(value.dateTime).getTime();
+        return Number.isFinite(ts) ? `dt:${ts}` : `dt:${String(value.dateTime)}`;
+      }
+
+      if (value.date) {
+        const day = this.normalizeEventTextValue(value.date);
+        return `d:${day}`;
+      }
+    }
+
+    const normalized = this.normalizeEventTextValue(value);
+    if (!normalized) return '';
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+      return `d:${normalized}`;
+    }
+
+    const ts = new Date(normalized).getTime();
+    return Number.isFinite(ts) ? `dt:${ts}` : normalized;
+  }
+
+  getEventExactMatchKey(event) {
+    const start = this.getNormalizedEventTimeValue(event.start);
+    const end = this.getNormalizedEventTimeValue(event.end);
+    const summary = this.normalizeEventTextValue(event.summary);
+    const description = this.normalizeEventTextValue(event.description);
+    const location = this.normalizeEventTextValue(event.location);
+    return `${start}|${end}|${summary}|${description}|${location}`;
+  }
+
+  combineDuplicateCalendarEvents(events) {
+    if (!this._config.combine_calendars) {
+      return events;
+    }
+
+    const groupedEvents = new Map();
+
+    events.forEach(event => {
+      const key = this.getEventExactMatchKey(event);
+      if (!groupedEvents.has(key)) {
+        groupedEvents.set(key, {
+          baseEvent: event,
+          calendars: [{ entityId: event.entityId, color: event.color }],
+          sourceEvents: [event]
+        });
+        return;
+      }
+
+      const grouped = groupedEvents.get(key);
+      if (!grouped.calendars.some(calendar => calendar.entityId === event.entityId)) {
+        grouped.calendars.push({ entityId: event.entityId, color: event.color });
+      }
+      grouped.sourceEvents.push(event);
+    });
+
+    return Array.from(groupedEvents.values()).map(({ baseEvent, calendars, sourceEvents }) => {
+      if (calendars.length === 1) {
+        return baseEvent;
+      }
+
+      return {
+        ...baseEvent,
+        isCombinedCalendarEvent: true,
+        sourceCalendars: calendars,
+        sourceEntityIds: calendars.map(calendar => calendar.entityId),
+        sourceEvents,
+        entityId: calendars[0].entityId,
+        color: calendars[0].color
+      };
+    });
+  }
+
+  getVisibleCalendarColorsForEvent(event) {
+    if (event.isCombinedCalendarEvent && Array.isArray(event.sourceCalendars)) {
+      return event.sourceCalendars
+        .filter(calendar => !this._hiddenCalendars.has(calendar.entityId))
+        .map(calendar => calendar.color);
+    }
+
+    if (this._hiddenCalendars.has(event.entityId)) {
+      return [];
+    }
+
+    return [event.color];
+  }
+
+  createZebraStripeGradient(colors) {
+    if (colors.length === 1) {
+      return colors[0];
+    }
+
+    const configuredStripeWidth = Number(this._config?.combine_calendars_width);
+    const stripeWidthPx = Number.isFinite(configuredStripeWidth) && configuredStripeWidth > 0
+      ? configuredStripeWidth
+      : 12;
+    const cycle = colors.map((color, index) => {
+      const start = index * stripeWidthPx;
+      const end = start + stripeWidthPx;
+      return `${color} ${start}px ${end}px`;
+    }).join(', ');
+
+    return `repeating-linear-gradient(135deg, ${cycle})`;
+  }
+
+  getEventStyle(event, { withBorderAccent = false } = {}) {
+    const visibleColors = this.getVisibleCalendarColorsForEvent(event);
+    const primaryColor = visibleColors[0] || event.color;
+
+    const shouldShowBorderAccent = withBorderAccent && visibleColors.length <= 1;
+    const borderStyle = shouldShowBorderAccent
+      ? `border-left: 4px solid ${primaryColor};`
+      : 'border-left: none;';
+
+    if (visibleColors.length <= 1) {
+      return `background-color: ${primaryColor}; background-image: none; background-clip: padding-box; ${borderStyle}`;
+    }
+
+    const stripeGradient = this.createZebraStripeGradient(visibleColors);
+    return `background-color: ${primaryColor}; background-image: ${stripeGradient}; background-clip: padding-box; ${borderStyle}`;
   }
 
   getEventDateTimeInfo(event) {
@@ -3572,12 +3742,13 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   getEventsForDay(date) {
-    return this._events.filter(event => {
-      // Filter out events from hidden calendars
-      if (this._hiddenCalendars.has(event.entityId)) {
+    const sourceEvents = this.combineDuplicateCalendarEvents(this._events);
+
+    return sourceEvents.filter(event => {
+      if (this.getVisibleCalendarColorsForEvent(event).length === 0) {
         return false;
       }
-      
+
       return this.getEventDaySegment(event, date) !== null;
     });
   }
@@ -4185,11 +4356,15 @@ class SkylightCalendarCard extends HTMLElement {
     
     // Close button
     this.shadowRoot.getElementById('close-modal').addEventListener('click', () => {
+      this._combinedEditTargets = null;
+      this._combinedDeleteTargets = null;
       modal.classList.remove('show');
     });
     
     // Cancel button
     this.shadowRoot.getElementById('cancel-btn').addEventListener('click', () => {
+      this._combinedEditTargets = null;
+      this._combinedDeleteTargets = null;
       modal.classList.remove('show');
     });
     
@@ -4298,6 +4473,8 @@ class SkylightCalendarCard extends HTMLElement {
       
       try {
         await Promise.all(selectedCalendarIds.map((calendarId) => this.createEvent(calendarId, eventData)));
+        this._combinedDeleteTargets = null;
+        this._combinedDeleteTargets = null;
         modal.classList.remove('show');
         
         // Refresh events
@@ -4543,11 +4720,15 @@ class SkylightCalendarCard extends HTMLElement {
     
     // Close button
     this.shadowRoot.getElementById('close-modal').addEventListener('click', () => {
+      this._combinedEditTargets = null;
+      this._combinedDeleteTargets = null;
       modal.classList.remove('show');
     });
     
     // Cancel button
     this.shadowRoot.getElementById('cancel-btn').addEventListener('click', () => {
+      this._combinedEditTargets = null;
+      this._combinedDeleteTargets = null;
       modal.classList.remove('show');
     });
     
@@ -4649,7 +4830,17 @@ class SkylightCalendarCard extends HTMLElement {
       submitBtn.textContent = this.t('saving');
       
       try {
-        await this.updateEvent(event, calendarId, eventData, editScope);
+        const editTargets = Array.isArray(this._combinedEditTargets) && this._combinedEditTargets.length > 0
+          ? this._combinedEditTargets
+          : [event];
+
+        for (const targetEvent of editTargets) {
+          const targetCalendarId = (editTargets.length > 1) ? targetEvent.entityId : calendarId;
+          await this.updateEvent(targetEvent, targetCalendarId, eventData, editScope);
+        }
+
+        this._combinedEditTargets = null;
+        this._combinedDeleteTargets = null;
         modal.classList.remove('show');
         
         // Refresh events
@@ -4673,6 +4864,8 @@ class SkylightCalendarCard extends HTMLElement {
           }
         }
 
+        this._combinedEditTargets = null;
+        this._combinedDeleteTargets = null;
         this.showFormError(errorDiv, error.message || this.t('failedUpdateEvent'));
         submitBtn.disabled = false;
         submitBtn.textContent = this.t('saveChanges');
@@ -4962,12 +5155,13 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
 
-  showEditConfirmation(event, startDate, endDate, isAllDay) {
+  showEditConfirmation(event, startDate, endDate, isAllDay, selectedEvents = null) {
     const modal = this.shadowRoot.getElementById('event-modal');
     const content = this.shadowRoot.getElementById('modal-content');
 
     const isRecurring = event.rrule || event.recurrence_id;
     if (!isRecurring) {
+      this._combinedEditTargets = selectedEvents;
       this.showEditEventModal(event, startDate, endDate, isAllDay, 'this');
       return;
     }
@@ -5024,12 +5218,121 @@ class SkylightCalendarCard extends HTMLElement {
     this.shadowRoot.getElementById('confirm-edit-option-btn')?.addEventListener('click', () => {
       const selectedOption = this.shadowRoot.querySelector('input[name="edit-option"]:checked')?.value || 'this';
       modal.classList.remove('show');
+      this._combinedEditTargets = selectedEvents;
       this.showEditEventModal(event, startDate, endDate, isAllDay, selectedOption);
     });
   }
 
 
-  showDeleteConfirmation(event) {
+  showCombinedEditSelectionModal(event, startDate, endDate, isAllDay) {
+    const modal = this.shadowRoot.getElementById('event-modal');
+    const content = this.shadowRoot.getElementById('modal-content');
+
+    const sourceEvents = (event.sourceEvents || []).filter(sourceEvent => !this._hiddenCalendars.has(sourceEvent.entityId));
+
+    content.innerHTML = `
+      <div class="confirm-dialog">
+        <h3 class="confirm-title">${this.t('editEvent')}</h3>
+        <p class="confirm-message">Select which calendar copies to edit.</p>
+
+        <div class="recurring-options">
+          ${sourceEvents.map((sourceEvent, index) => `
+            <label class="recurring-option">
+              <input type="checkbox" class="combined-edit-option" data-index="${index}" checked />
+              <div class="recurring-option-label">
+                <div class="recurring-option-title">${this.escapeHtml(this.getCalendarName(sourceEvent.entityId))}</div>
+                <div class="recurring-option-description">${this.escapeHtml(sourceEvent.summary || this.t('untitledEvent'))}</div>
+              </div>
+            </label>
+          `).join('')}
+        </div>
+
+        <div class="confirm-actions">
+          <button class="btn btn-secondary" id="cancel-combined-edit-btn">${this.t('cancel')}</button>
+          <button class="btn btn-primary" id="confirm-combined-edit-btn">${this.t('editEvent')}</button>
+        </div>
+      </div>
+    `;
+
+    modal.classList.add('show');
+
+    this.shadowRoot.getElementById('cancel-combined-edit-btn')?.addEventListener('click', () => {
+      modal.classList.remove('show');
+      this.showEventModal(event);
+    });
+
+    this.shadowRoot.getElementById('confirm-combined-edit-btn')?.addEventListener('click', () => {
+      const selectedIndexes = Array.from(this.shadowRoot.querySelectorAll('.combined-edit-option:checked'))
+        .map(input => Number.parseInt(input.getAttribute('data-index'), 10))
+        .filter(index => Number.isInteger(index) && index >= 0 && index < sourceEvents.length);
+
+      if (selectedIndexes.length === 0) {
+        return;
+      }
+
+      const selectedEvents = selectedIndexes.map(index => sourceEvents[index]);
+      modal.classList.remove('show');
+      this.showEditConfirmation(selectedEvents[0], startDate, endDate, isAllDay, selectedEvents);
+    });
+  }
+
+
+  showCombinedDeleteSelectionModal(event) {
+    const modal = this.shadowRoot.getElementById('event-modal');
+    const content = this.shadowRoot.getElementById('modal-content');
+
+    const sourceEvents = (event.sourceEvents || []).filter(sourceEvent => !this._hiddenCalendars.has(sourceEvent.entityId));
+
+    content.innerHTML = `
+      <div class="confirm-dialog">
+        <h3 class="confirm-title">${this.t('deleteEventTitle')}</h3>
+        <p class="confirm-message">Select which calendar copies to delete.</p>
+
+        <div class="recurring-options">
+          ${sourceEvents.map((sourceEvent, index) => `
+            <label class="recurring-option">
+              <input type="checkbox" class="combined-delete-option" data-index="${index}" checked />
+              <div class="recurring-option-label">
+                <div class="recurring-option-title">${this.escapeHtml(this.getCalendarName(sourceEvent.entityId))}</div>
+                <div class="recurring-option-description">${this.escapeHtml(sourceEvent.summary || this.t('untitledEvent'))}</div>
+              </div>
+            </label>
+          `).join('')}
+        </div>
+
+        <div class="confirm-actions">
+          <button class="btn btn-secondary" id="cancel-combined-delete-btn">${this.t('cancel')}</button>
+          <button class="btn btn-danger" id="confirm-combined-delete-btn">${this.t('delete')}</button>
+        </div>
+      </div>
+    `;
+
+    modal.classList.add('show');
+
+    this.shadowRoot.getElementById('cancel-combined-delete-btn')?.addEventListener('click', () => {
+      this._combinedDeleteTargets = null;
+      modal.classList.remove('show');
+      this.showEventModal(event);
+    });
+
+    this.shadowRoot.getElementById('confirm-combined-delete-btn')?.addEventListener('click', () => {
+      const selectedIndexes = Array.from(this.shadowRoot.querySelectorAll('.combined-delete-option:checked'))
+        .map(input => Number.parseInt(input.getAttribute('data-index'), 10))
+        .filter(index => Number.isInteger(index) && index >= 0 && index < sourceEvents.length);
+
+      if (selectedIndexes.length === 0) {
+        return;
+      }
+
+      const selectedDeleteTargets = selectedIndexes.map(index => sourceEvents[index]);
+      this._combinedDeleteTargets = selectedDeleteTargets;
+      modal.classList.remove('show');
+      this.showDeleteConfirmation(selectedDeleteTargets[0], selectedDeleteTargets);
+    });
+  }
+
+
+  showDeleteConfirmation(event, selectedEvents = null) {
     const modal = this.shadowRoot.getElementById('event-modal');
     const content = this.shadowRoot.getElementById('modal-content');
     
@@ -5099,6 +5402,7 @@ class SkylightCalendarCard extends HTMLElement {
     
     // Cancel button
     this.shadowRoot.getElementById('cancel-delete-btn').addEventListener('click', () => {
+      this._combinedDeleteTargets = null;
       modal.classList.remove('show');
     });
     
@@ -5109,25 +5413,36 @@ class SkylightCalendarCard extends HTMLElement {
       deleteBtn.textContent = this.t('deleting');
       
       try {
+        const deleteTargets = Array.isArray(selectedEvents) && selectedEvents.length > 0
+          ? selectedEvents
+          : (Array.isArray(this._combinedDeleteTargets) && this._combinedDeleteTargets.length > 0
+              ? this._combinedDeleteTargets
+              : [event]);
+
         if (isRecurring) {
           // Get the selected option
           const selectedOption = this.shadowRoot.querySelector('input[name="delete-option"]:checked')?.value;
-          
-          if (selectedOption === 'this') {
-            // Delete this instance only
-            await this.deleteEvent(event.entityId, event.uid, event.recurrence_id);
-          } else if (selectedOption === 'future') {
-            // Delete this and future instances
-            await this.deleteEvent(event.entityId, event.uid, event.recurrence_id, 'THISANDFUTURE');
-          } else {
-            // Delete entire series
-            await this.deleteEvent(event.entityId, event.uid);
+
+          for (const targetEvent of deleteTargets) {
+            if (selectedOption === 'this') {
+              // Delete this instance only
+              await this.deleteEvent(targetEvent.entityId, targetEvent.uid, targetEvent.recurrence_id);
+            } else if (selectedOption === 'future') {
+              // Delete this and future instances
+              await this.deleteEvent(targetEvent.entityId, targetEvent.uid, targetEvent.recurrence_id, 'THISANDFUTURE');
+            } else {
+              // Delete entire series
+              await this.deleteEvent(targetEvent.entityId, targetEvent.uid);
+            }
           }
         } else {
-          // Delete single event
-          await this.deleteEvent(event.entityId, event.uid);
+          for (const targetEvent of deleteTargets) {
+            // Delete single event
+            await this.deleteEvent(targetEvent.entityId, targetEvent.uid);
+          }
         }
-        
+
+        this._combinedDeleteTargets = null;
         modal.classList.remove('show');
         
         // Refresh events
@@ -5135,6 +5450,7 @@ class SkylightCalendarCard extends HTMLElement {
         await this.updateEvents();
       } catch (error) {
         console.error('Failed to delete event:', error);
+        this._combinedDeleteTargets = null;
         alert(error.message || this.t('failedDeleteEvent'));
         deleteBtn.disabled = false;
         deleteBtn.textContent = this.t('delete');
@@ -5190,6 +5506,10 @@ class SkylightCalendarCard extends HTMLElement {
     // Get calendar info and capabilities
     const calendarName = this.getCalendarName(event.entityId);
     const capabilities = this._calendarCapabilities[event.entityId] || {};
+    const visibleBadges = this.getVisibleCalendarBadgesForEvent(event);
+    const combinedBadgeHtml = event.isCombinedCalendarEvent
+      ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">${visibleBadges.map(calendar => `<span class="modal-calendar-badge" style="background: ${calendar.color}; color: white; display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px;">${this.escapeHtml(this.getCalendarName(calendar.entityId))}</span>`).join('')}</div>`
+      : `<div class="modal-calendar-badge" style="background: ${event.color}; color: white; display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; margin-top: 8px;">${this.escapeHtml(calendarName)}</div>`;
     
     // For edit/delete to work, we need:
     // 1. Event management enabled
@@ -5208,9 +5528,7 @@ class SkylightCalendarCard extends HTMLElement {
       <div class="modal-header">
         <div>
           <h3 class="modal-title">${this.escapeHtml(event.summary || this.t('untitledEvent'))}</h3>
-          <div class="modal-calendar-badge" style="background: ${event.color}; color: white; display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; margin-top: 8px;">
-            ${this.escapeHtml(calendarName)}
-          </div>
+          ${combinedBadgeHtml}
         </div>
         <button class="modal-close" id="close-modal">×</button>
       </div>
@@ -5303,6 +5621,10 @@ class SkylightCalendarCard extends HTMLElement {
     this.shadowRoot.getElementById('edit-event-btn')?.addEventListener('click', () => {
       this._activeModalBackHandler = null;
       modal.classList.remove('show');
+      if (event.isCombinedCalendarEvent && Array.isArray(event.sourceEvents) && event.sourceEvents.length > 1) {
+        this.showCombinedEditSelectionModal(event, startDate, endDate, isAllDay);
+        return;
+      }
       this.showEditConfirmation(event, startDate, endDate, isAllDay);
     });
     
@@ -5310,6 +5632,10 @@ class SkylightCalendarCard extends HTMLElement {
     this.shadowRoot.getElementById('delete-event-btn')?.addEventListener('click', () => {
       this._activeModalBackHandler = null;
       modal.classList.remove('show');
+      if (event.isCombinedCalendarEvent && Array.isArray(event.sourceEvents) && event.sourceEvents.length > 1) {
+        this.showCombinedDeleteSelectionModal(event);
+        return;
+      }
       this.showDeleteConfirmation(event);
     });
   }
