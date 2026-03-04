@@ -14,7 +14,9 @@ A clear and concise description of what the bug is.
 Describe which view(s) contain the bug. If the bug occurs when switching between views, describe how you recreate it.
 
 **Complete card yaml configuration**
-A clear and concise description of what you expected to happen.
+```yaml
+Paste your yaml here.
+```
 
 **Screenshots**
 Screenshots help.
