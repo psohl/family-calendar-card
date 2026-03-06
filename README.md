@@ -99,4 +99,26 @@ Full documentation has been moved to the wiki pages in this repository:
 - [Compatibility with Card Mod](https://github.com/superdingo101/skylight-calendar-card/wiki/Compatibility-with-Card-Mod)
 - [Development](https://github.com/superdingo101/skylight-calendar-card/wiki/Development)
 
-You can also browse by topic via the wiki sidebar: [Wiki Sidebar](https://github.com/superdingo101/skylight-calendar-card/wiki/_Sidebar).
+<br>
+
+## Help
+
+Feel free to open an issue if something is not working as expected. 
+
+[![GitHub Issues](https://img.shields.io/badge/GitHub-Issues-green?logo=github&style=for-the-badge)](https://github.com/superdingo101/skylight-calendar-card/issues)
+
+Got questions or thoughts? Want to share your dashboards? You can go on the Home Assistant forum or on the GitHub Discussions section.
+
+[![Home Assistant Community Forum](https://img.shields.io/badge/Home%20Assistant-Community%20Forum-blue?logo=home-assistant&style=for-the-badge)](https://community.home-assistant.io/t/skylight-calendar-card-a-family-friendly-schedule-card/981221/17) [![GitHub Discussions](https://img.shields.io/badge/GitHub-Discussions-lightgrey?logo=github&style=for-the-badge)](https://github.com/superdingo101/skylight-calendar-card/discussions)
+
+<br>
+
+## Donate
+
+I dedicate most of my spare time to making this project the best it can be. So if you appreciate my work, any donation would be a great way to show your support 🍻
+
+[![Buy me a beer](https://img.shields.io/badge/Donate-Buy%20me%20a%20beer-yellow?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/superdingo101)
+
+<br>
+
+Thank you everyone for your support, you all are my greatest motivation!
