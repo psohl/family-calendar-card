@@ -663,7 +663,8 @@ class SkylightCalendarCard extends HTMLElement {
       locale: config.locale || null, // Locale override for date/time formatting (e.g., 'en-US')
       default_dark_mode: config.default_dark_mode ?? config.dark_mode ?? false, // Start in dark mode on initial load
       preference_storage_key: config.preference_storage_key || null, // Optional key to isolate saved preferences per card
-      ...config
+      ...config,
+      default_view: normalizedDefaultView || 'month' // Re-apply normalization after spread for legacy values
     };
     this._viewMode = this._config.default_view;
     this._isDarkMode = !!this._config.default_dark_mode;
