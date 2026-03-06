@@ -627,7 +627,6 @@ class SkylightCalendarCard extends HTMLElement {
     this._config = {
       title: this._hasCustomTitle ? config.title : translate(language, 'defaultTitle'),
       entities: config.entities,
-      showWeekNumbers: config.show_week_numbers !== false,
       firstDayOfWeek: config.first_day_of_week || 0, // 0 = Sunday
       colors: config.colors || {},
       calendar_names: config.calendar_names || {}, // Map entity IDs to friendly names
@@ -5930,7 +5929,6 @@ class SkylightCalendarCard extends HTMLElement {
       title: 'Family Calendar',
       entities: ['calendar.personal'],
       default_view: 'month',
-      show_week_numbers: false,
       first_day_of_week: 0,
       week_days: [0, 1, 2, 3, 4, 5, 6],
       week_start_hour: 8,
