@@ -484,6 +484,7 @@ class SkylightCalendarCard extends HTMLElement {
     this._fetching = false;
     this._lastFetch = null;
     this._loadedEventRange = null;
+    this._calendarDataSignatures = {}; // Track per-calendar data for change detection
     this._hiddenCalendars = new Set(); // Track which calendars are hidden
     this._calendarCapabilities = {}; // Track calendar capabilities
     this._activeLanguage = DEFAULT_LANGUAGE;
@@ -709,6 +710,7 @@ class SkylightCalendarCard extends HTMLElement {
     );
     this.loadPersistedPreferences();
     this._loadedEventRange = null;
+    this._calendarDataSignatures = {};
     this.setWeekStart();
     this.render();
     this._activeLanguage = language;
@@ -849,6 +851,11 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   async fetchEventsInRange(startDate, endDate) {
+    const eventsByCalendar = await this.fetchEventsByCalendarInRange(startDate, endDate);
+    return Object.values(eventsByCalendar).flat();
+  }
+
+  async fetchEventsByCalendarInRange(startDate, endDate) {
     const chunks = this.getDateRangeChunks(startDate, endDate, 30);
     const eventsByCalendar = await Promise.all(
       this._config.entities.map((entityId, index) =>
@@ -856,7 +863,10 @@ class SkylightCalendarCard extends HTMLElement {
       )
     );
 
-    return eventsByCalendar.flat();
+    return this._config.entities.reduce((acc, entityId, index) => {
+      acc[entityId] = eventsByCalendar[index] || [];
+      return acc;
+    }, {});
   }
 
   async fetchEventsForCalendar(entityId, colorIndex, chunks) {
@@ -938,6 +948,31 @@ class SkylightCalendarCard extends HTMLElement {
     return events.slice(0, this._config.maxEvents);
   }
 
+  toStableString(value) {
+    if (Array.isArray(value)) {
+      return `[${value.map(item => this.toStableString(item)).join(',')}]`;
+    }
+
+    if (value && typeof value === 'object') {
+      const entries = Object.keys(value)
+        .sort()
+        .map(key => `${JSON.stringify(key)}:${this.toStableString(value[key])}`);
+      return `{${entries.join(',')}}`;
+    }
+
+    return JSON.stringify(value);
+  }
+
+  getCalendarDataSignature(events = []) {
+    return events
+      .map(event => {
+        const { entityId, color, ...eventData } = event;
+        return this.toStableString(eventData);
+      })
+      .sort()
+      .join('|');
+  }
+
   async updateEvents() {
     if (!this._hass || this._fetching) return;
 
@@ -946,9 +981,27 @@ class SkylightCalendarCard extends HTMLElement {
     this._lastFetch = Date.now();
 
     try {
-      const newEvents = await this.fetchEventsInRange(startDate, endDate);
-      newEvents.sort((a, b) => this.getEventStartDate(a) - this.getEventStartDate(b));
-      this._events = this.limitEvents(newEvents);
+      const newEventsByCalendar = await this.fetchEventsByCalendarInRange(startDate, endDate);
+      const changedCalendars = this._config.entities.filter(entityId => {
+        const oldSignature = this._calendarDataSignatures[entityId] || '';
+        const newSignature = this.getCalendarDataSignature(newEventsByCalendar[entityId]);
+        return oldSignature !== newSignature;
+      });
+
+      if (changedCalendars.length === 0) {
+        this._loadedEventRange = { startDate, endDate };
+        return;
+      }
+
+      this._config.entities.forEach(entityId => {
+        this._calendarDataSignatures[entityId] = this.getCalendarDataSignature(newEventsByCalendar[entityId]);
+      });
+
+      const mergedEvents = Object.values(newEventsByCalendar)
+        .flat()
+        .sort((a, b) => this.getEventStartDate(a) - this.getEventStartDate(b));
+
+      this._events = this.limitEvents(mergedEvents);
       this._loadedEventRange = { startDate, endDate };
       this.render();
     } finally {
