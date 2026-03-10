@@ -680,6 +680,7 @@ class SkylightCalendarCard extends HTMLElement {
       compact_header: config.compact_header || false, // Compact header layout
       hide_event_calendar_bubble: config.hide_event_calendar_bubble || false, // Hide calendar initial bubble on events
       event_font_size: config.event_font_size ?? 11, // Font size for event bubble text in every view
+      event_time_font_size: config.event_time_font_size ?? 9, // Font size for event time text in every view
       event_font_colors: normalizedEventFontColors, // Per-calendar font colors for event bubble text
       hide_times_for_calendars: config.hide_times_for_calendars || [], // Hide times in schedule view for specific calendars
       show_current_time_bar: config.show_current_time_bar || false, // Show a "now" indicator in schedule view
@@ -1670,7 +1671,7 @@ class SkylightCalendarCard extends HTMLElement {
       }
       
       .event-time {
-        font-size: 0.9em;
+        font-size: var(--event-time-font-size, 9px);
         opacity: 0.9;
         margin-right: 4px;
       }
@@ -1756,7 +1757,7 @@ class SkylightCalendarCard extends HTMLElement {
       }
       
       .week-compact-event-time {
-        font-size: 0.85em;
+        font-size: var(--event-time-font-size, 9px);
         font-weight: 600;
         opacity: 0.9;
         margin-bottom: 4px;
@@ -2092,7 +2093,7 @@ class SkylightCalendarCard extends HTMLElement {
       }
       
       .week-standard-event-time {
-        font-size: 0.85em;
+        font-size: var(--event-time-font-size, 9px);
         font-weight: 500;
         opacity: 0.85;
       }
@@ -3118,7 +3119,7 @@ class SkylightCalendarCard extends HTMLElement {
                   const eventStyle = this.getEventStyle(event);
                   
                   return `
-                    <div class="week-compact-event" style="${eventStyle} --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
+                    <div class="week-compact-event" style="${eventStyle} --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-time-font-size: ${this.getEventTimeFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
                       <div class="week-compact-event-time">${timeLabel}</div>
                       <div class="week-compact-event-title">${this.escapeHtml(event.summary || this.t('untitledEvent'))}</div>
                     </div>
@@ -3262,7 +3263,7 @@ class SkylightCalendarCard extends HTMLElement {
           const eventStyle = this.getEventStyle(event, { withBorderAccent: false });
           return `
             <div class="all-day-event" 
-                 style="${eventStyle} --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};"
+                 style="${eventStyle} --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-time-font-size: ${this.getEventTimeFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};"
                  data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
               <div class="all-day-event-title">${this.escapeHtml(event.summary || this.t('untitledEvent'))}</div>
             </div>
@@ -3381,7 +3382,7 @@ class SkylightCalendarCard extends HTMLElement {
       
       return `
         <div class="week-standard-event" 
-             style="top: ${top}px; height: ${height}px; width: ${width}; left: ${left}; ${eventStyle} --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};"
+             style="top: ${top}px; height: ${height}px; width: ${width}; left: ${left}; ${eventStyle} --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-time-font-size: ${this.getEventTimeFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};"
              data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
           <div class="week-standard-event-title">${this.escapeHtml(event.summary || this.t('untitledEvent'))}</div>
           ${this.shouldShowEventTime(event) ? `<div class="week-standard-event-time">${this.formatScheduleTime(eventStart)} - ${this.formatScheduleTime(eventEnd)}</div>` : ''}
@@ -3459,6 +3460,21 @@ class SkylightCalendarCard extends HTMLElement {
 
     const normalized = String(configuredSize).trim();
     if (!normalized) return '11px';
+    return /^\d+(\.\d+)?$/.test(normalized) ? `${normalized}px` : normalized;
+  }
+
+  getEventTimeFontSize() {
+    const configuredSize = this._config?.event_time_font_size;
+    if (configuredSize === undefined || configuredSize === null || configuredSize === '') {
+      return '9px';
+    }
+
+    if (typeof configuredSize === 'number' && Number.isFinite(configuredSize)) {
+      return `${configuredSize}px`;
+    }
+
+    const normalized = String(configuredSize).trim();
+    if (!normalized) return '9px';
     return /^\d+(\.\d+)?$/.test(normalized) ? `${normalized}px` : normalized;
   }
 
@@ -3712,7 +3728,7 @@ class SkylightCalendarCard extends HTMLElement {
     const eventStyle = this.getEventStyle(event);
     
     return `
-      <div class="event" style="${eventStyle}; --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
+      <div class="event" style="${eventStyle}; --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-time-font-size: ${this.getEventTimeFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
         ${!isAllDaySegment ? `<span class="event-time">${this.formatTime(segmentStart)}</span>` : ''}
         ${this.escapeHtml(event.summary || this.t('untitledEvent'))}
       </div>
@@ -5867,7 +5883,7 @@ class SkylightCalendarCard extends HTMLElement {
               const { segmentStart, isAllDaySegment } = daySegment;
               const timeLabel = isAllDaySegment ? this.t('allDay') : this.formatTime(segmentStart);
               return `
-                <div class="week-compact-event" style="background: ${event.color}; --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
+                <div class="week-compact-event" style="background: ${event.color}; --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-time-font-size: ${this.getEventTimeFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
                   <div class="week-compact-event-time">${timeLabel}</div>
                   <div class="week-compact-event-title">${this.escapeHtml(event.summary || this.t('untitledEvent'))}</div>
                 </div>
@@ -6158,6 +6174,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
       week_end_hour: 21,
       height_scale: 1,
       event_font_size: 11,
+      event_time_font_size: 9,
       combine_calendars_width: 12,
       max_events: 0,
       first_day_of_week: 0
@@ -6593,6 +6610,12 @@ class SkylightCalendarCardEditor extends HTMLElement {
         <div class="field field-inline">
           <label for="event_font_size">Event font size</label>
           <input id="event_font_size" data-field="event_font_size" data-type="number" type="number" min="8" max="32" value="${Number(this._config.event_font_size ?? this.getEditorDefaultValue('event_font_size'))}">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field field-inline">
+          <label for="event_time_font_size">Event time font size</label>
+          <input id="event_time_font_size" data-field="event_time_font_size" data-type="number" type="number" min="8" max="32" value="${Number(this._config.event_time_font_size ?? this.getEditorDefaultValue('event_time_font_size'))}">
         </div>
       </div>
       ${this.renderSubSection('Hide times for calendars', `<div class="list-checkbox-grid">${this.renderCalendarListCheckboxes('hide_times_for_calendars', { label: 'hidden times calendars' })}</div>`)}
