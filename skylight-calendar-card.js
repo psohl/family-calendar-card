@@ -983,13 +983,19 @@ class SkylightCalendarCard extends HTMLElement {
     try {
       const newEventsByCalendar = await this.fetchEventsByCalendarInRange(startDate, endDate);
       const changedCalendars = this._config.entities.filter(entityId => {
-        const oldSignature = this._calendarDataSignatures[entityId] || '';
+        const hasOldSignature = Object.prototype.hasOwnProperty.call(this._calendarDataSignatures, entityId);
+        if (!hasOldSignature) {
+          return true;
+        }
+
+        const oldSignature = this._calendarDataSignatures[entityId];
         const newSignature = this.getCalendarDataSignature(newEventsByCalendar[entityId]);
         return oldSignature !== newSignature;
       });
 
       if (changedCalendars.length === 0) {
         this._loadedEventRange = { startDate, endDate };
+        this.render();
         return;
       }
 
