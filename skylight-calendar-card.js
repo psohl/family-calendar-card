@@ -3867,10 +3867,10 @@ class SkylightCalendarCard extends HTMLElement {
     const start = this.getNormalizedEventTimeValue(event.start);
     const end = this.getNormalizedEventTimeValue(event.end);
     const summary = this.normalizeEventTextValue(event.summary);
-    const description = this.normalizeEventTextValue(event.description);
     const location = this.normalizeEventTextValue(event.location);
-    return `${start}|${end}|${summary}|${description}|${location}`;
+    return `${start}|${end}|${summary}|${location}`;
   }
+
 
   combineDuplicateCalendarEvents(events) {
     if (!this._config.combine_calendars) {
@@ -6797,6 +6797,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
         <label><input type="checkbox" data-field="hide_event_calendar_bubble" ${this._config.hide_event_calendar_bubble ? 'checked' : ''}> Hide event calendar bubble</label>
         <label><input type="checkbox" data-field="combine_calendars" ${this._config.combine_calendars ? 'checked' : ''}> Combine duplicate events across calendars</label>
       </div>
+      <div class="field-note">Match criteria for combining calendars: Start, End, Title, Location</div>
       <div class="field">
         <label for="combine_style">Combined indicator style</label>
         <select id="combine_style" data-field="combine_style">
