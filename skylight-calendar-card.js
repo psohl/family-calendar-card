@@ -6325,6 +6325,47 @@ class SkylightCalendarCardEditor extends HTMLElement {
       v: 1,
       color: '#3f51b5'
     };
+    this._combineBackgroundMode = 'primary';
+    this._combineBackgroundHexDraft = '';
+    this._openDisclosureKeys = new Set();
+  }
+
+  normalizeHexColor(colorValue) {
+    const normalizedColor = String(colorValue || '').trim();
+    if (!normalizedColor) return null;
+
+    const hex3Match = normalizedColor.match(/^#([\da-fA-F]{3})$/);
+    if (hex3Match) {
+      const [r, g, b] = hex3Match[1].split('');
+      return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+    }
+
+    const hex6Match = normalizedColor.match(/^#([\da-fA-F]{6})$/);
+    if (hex6Match) {
+      return `#${hex6Match[1].toUpperCase()}`;
+    }
+
+    return null;
+  }
+
+  syncCombineBackgroundEditorState(backgroundValue) {
+    const rawValue = String(backgroundValue || '').trim();
+    const normalizedLower = rawValue.toLowerCase();
+    if (normalizedLower === 'neutral' || normalizedLower === 'primary') {
+      this._combineBackgroundMode = normalizedLower;
+      this._combineBackgroundHexDraft = '';
+      return;
+    }
+
+    const normalizedHex = this.normalizeHexColor(rawValue);
+    if (normalizedHex) {
+      this._combineBackgroundMode = 'hex';
+      this._combineBackgroundHexDraft = normalizedHex;
+      return;
+    }
+
+    this._combineBackgroundMode = 'primary';
+    this._combineBackgroundHexDraft = '';
   }
 
   setConfig(config) {
@@ -6340,6 +6381,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
       ...config,
       default_view: normalizedDefaultView || (SkylightCalendarCard.getStubConfig().default_view || 'month')
     };
+    this.syncCombineBackgroundEditorState(this._config.combine_background);
 
     if (!this._rendered) {
       this.render();
@@ -6699,9 +6741,24 @@ class SkylightCalendarCardEditor extends HTMLElement {
       .join('');
   }
 
+  buildDisclosureKey(scope, title) {
+    return `${scope}:${title}`;
+  }
+
+  captureOpenDisclosures() {
+    const openKeys = new Set();
+    this.querySelectorAll('details[data-disclosure-key][open]').forEach((detail) => {
+      const key = detail.dataset.disclosureKey;
+      if (key) openKeys.add(key);
+    });
+    this._openDisclosureKeys = openKeys;
+  }
+
   renderSection(title, content) {
+    const disclosureKey = this.buildDisclosureKey('section', title);
+    const openAttr = this._openDisclosureKeys.has(disclosureKey) ? 'open' : '';
     return `
-      <details class="config-section">
+      <details class="config-section" data-disclosure-key="${disclosureKey}" ${openAttr}>
         <summary>${title}</summary>
         <div class="section-content">${content}</div>
       </details>
@@ -6709,8 +6766,10 @@ class SkylightCalendarCardEditor extends HTMLElement {
   }
 
   renderSubSection(title, content) {
+    const disclosureKey = this.buildDisclosureKey('subsection', title);
+    const openAttr = this._openDisclosureKeys.has(disclosureKey) ? 'open' : '';
     return `
-      <details class="config-subsection">
+      <details class="config-subsection" data-disclosure-key="${disclosureKey}" ${openAttr}>
         <summary>${title}</summary>
         <div class="subsection-content">${content}</div>
       </details>
@@ -6734,6 +6793,8 @@ class SkylightCalendarCardEditor extends HTMLElement {
   }
 
   render() {
+    this.captureOpenDisclosures();
+
     const displayLayoutSection = this.renderSection('Display & layout', `
       <div class="field-row">
         <div class="field field-inline">
@@ -6867,22 +6928,39 @@ class SkylightCalendarCardEditor extends HTMLElement {
         <label><input type="checkbox" data-field="hide_event_calendar_bubble" ${this._config.hide_event_calendar_bubble ? 'checked' : ''}> Hide event calendar bubble</label>
         <label><input type="checkbox" data-field="combine_calendars" ${this._config.combine_calendars ? 'checked' : ''}> Combine duplicate events across calendars</label>
       </div>
-      <div class="field-note">Match criteria for combining calendars: Start, End, Title, Location</div>
-      <div class="field">
-        <label for="combine_style">Combined indicator style</label>
-        <select id="combine_style" data-field="combine_style">
-          <option value="stripes" ${this._config.combine_style === 'stripes' ? 'selected' : ''}>Stripes</option>
-          <option value="bars" ${this._config.combine_style === 'bars' || !this._config.combine_style ? 'selected' : ''}>Bars</option>
-          <option value="dots" ${this._config.combine_style === 'dots' ? 'selected' : ''}>Dots</option>
-        </select>
+      <div class="field-row">
+        <div class="field field-inline">
+          <label for="combine_style">Combined indicator style</label>
+          <select id="combine_style" data-field="combine_style">
+            <option value="stripes" ${this._config.combine_style === 'stripes' ? 'selected' : ''}>Stripes</option>
+            <option value="bars" ${this._config.combine_style === 'bars' || !this._config.combine_style ? 'selected' : ''}>Bars</option>
+            <option value="dots" ${this._config.combine_style === 'dots' ? 'selected' : ''}>Dots</option>
+          </select>
+        </div>
       </div>
-      <div class="field">
-        <label for="combine_background">Combined background (neutral, primary, or #RRGGBB)</label>
-        <input id="combine_background" data-field="combine_background" type="text" value="${this._config.combine_background || 'primary'}" placeholder="primary">
+      <div class="field-row">
+        <div class="field field-inline">
+          <label for="combine_background_mode">Combined background</label>
+          <select id="combine_background_mode" data-field="combine_background_mode">
+            <option value="neutral" ${this._combineBackgroundMode === 'neutral' ? 'selected' : ''}>Neutral</option>
+            <option value="primary" ${this._combineBackgroundMode === 'primary' ? 'selected' : ''}>Primary</option>
+            <option value="hex" ${this._combineBackgroundMode === 'hex' ? 'selected' : ''}>Hex</option>
+          </select>
+        </div>
       </div>
-      <div class="field">
-        <label for="combine_calendars_width">Combined indicator width (px)</label>
-        <input id="combine_calendars_width" data-field="combine_calendars_width" data-type="number" type="number" min="1" value="${Number(this._config.combine_calendars_width ?? this.getEditorDefaultValue('combine_calendars_width'))}">
+      ${this._combineBackgroundMode === 'hex' ? `
+      <div class="field-row">
+        <div class="field field-inline">
+          <label for="combine_background_hex">Combined background hex value</label>
+          <input id="combine_background_hex" data-field="combine_background_hex" type="text" value="${this.escapeHtml(this._combineBackgroundHexDraft || '#FFFFFF')}" placeholder="#RRGGBB">
+        </div>
+      </div>
+      ` : ''}
+      <div class="field-row">
+        <div class="field field-inline">
+          <label for="combine_calendars_width">Combined indicator width (px)</label>
+          <input id="combine_calendars_width" data-field="combine_calendars_width" data-type="number" type="number" min="1" value="${Number(this._config.combine_calendars_width ?? this.getEditorDefaultValue('combine_calendars_width'))}">
+        </div>
       </div>
     `);
 
@@ -7442,7 +7520,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
       checkbox.checked = this.getListFieldValue(listField).includes(checkbox.value);
     });
 
-    this.querySelectorAll('input[data-type="number"], input[data-type="nullable-number"], input[data-type="list"], input[data-field="language"], input[data-field="locale"], input[data-field="preference_storage_key"], input[data-field="background_image_url"], input[data-field="background_image_size"], input[data-field="background_image_position"], input[data-field="background_image_repeat"], input[data-field="combine_background"]').forEach((input) => {
+    this.querySelectorAll('input[data-type="number"], input[data-type="nullable-number"], input[data-type="list"], input[data-field="language"], input[data-field="locale"], input[data-field="preference_storage_key"], input[data-field="background_image_url"], input[data-field="background_image_size"], input[data-field="background_image_position"], input[data-field="background_image_repeat"]').forEach((input) => {
       if (document.activeElement === input) return;
       const field = input.dataset.field;
       const type = input.dataset.type;
@@ -7462,8 +7540,17 @@ class SkylightCalendarCardEditor extends HTMLElement {
       const field = select.dataset.field;
       if (field === 'default_view') return;
       if (field === 'first_day_of_week') return;
+      if (field === 'combine_background_mode') {
+        select.value = this._combineBackgroundMode;
+        return;
+      }
       select.value = this._config[field] || '';
     });
+
+    const combineBackgroundHexInput = this.querySelector('input[data-field="combine_background_hex"]');
+    if (combineBackgroundHexInput && document.activeElement !== combineBackgroundHexInput) {
+      combineBackgroundHexInput.value = this._combineBackgroundHexDraft || '#FFFFFF';
+    }
 
     const headerColorTextInput = this.querySelector('input[data-field="header_color_text"]');
     if (headerColorTextInput && document.activeElement !== headerColorTextInput) {
@@ -7502,6 +7589,50 @@ class SkylightCalendarCardEditor extends HTMLElement {
   handleChange(event) {
     const field = event.target.dataset.field;
     const nextConfig = { ...this.value };
+
+    if (field === 'combine_background_mode') {
+      this._combineBackgroundMode = event.target.value;
+      if (this._combineBackgroundMode === 'hex') {
+        const currentHex = this.normalizeHexColor(this._config.combine_background) || this._combineBackgroundHexDraft || '#FFFFFF';
+        this._combineBackgroundHexDraft = currentHex;
+        nextConfig.combine_background = currentHex;
+      } else {
+        this._combineBackgroundHexDraft = '';
+        nextConfig.combine_background = this._combineBackgroundMode;
+      }
+
+      this._config = nextConfig;
+      this.render();
+      this.dispatchEvent(
+        new CustomEvent('config-changed', {
+          detail: { config: nextConfig },
+          bubbles: true,
+          composed: true
+        })
+      );
+      return;
+    }
+
+    if (field === 'combine_background_hex') {
+      const normalizedHex = this.normalizeHexColor(event.target.value);
+      if (normalizedHex) {
+        this._combineBackgroundHexDraft = normalizedHex;
+        nextConfig.combine_background = normalizedHex;
+      } else {
+        this._combineBackgroundHexDraft = event.target.value;
+      }
+
+      this._config = nextConfig;
+      this.render();
+      this.dispatchEvent(
+        new CustomEvent('config-changed', {
+          detail: { config: nextConfig },
+          bubbles: true,
+          composed: true
+        })
+      );
+      return;
+    }
 
     if (field === 'entity') {
       const selected = Array.from(this.querySelectorAll('input[data-field="entity"]:checked')).map((input) => input.value);
