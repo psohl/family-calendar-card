@@ -687,8 +687,11 @@ class SkylightCalendarCard extends HTMLElement {
       hide_controls: config.hide_controls || false, // Hide header controls (add/view/theme/navigation)
       hide_dark_mode_toggle: config.hide_dark_mode_toggle || false, // Hide dark mode toggle from header controls
       hide_event_calendar_bubble: config.hide_event_calendar_bubble || false, // Hide calendar initial bubble on events
+      show_event_location: config.show_event_location || false, // Show event location in week and schedule views
       event_font_size: config.event_font_size ?? 11, // Font size for event bubble text in every view
       event_time_font_size: config.event_time_font_size ?? 9, // Font size for event time text in every view
+      event_location_font_size: config.event_location_font_size ?? 9, // Font size for event location text in week and schedule views
+      event_calendar_friendly_name: config.event_calendar_friendly_name || false, // Show friendly calendar name in event bubble area instead of icon
       event_font_colors: normalizedEventFontColors, // Per-calendar font colors for event bubble text
       hide_times_for_calendars: config.hide_times_for_calendars || [], // Hide times in schedule view for specific calendars
       show_current_time_bar: config.show_current_time_bar || false, // Show a "now" indicator in schedule view
@@ -1886,6 +1889,16 @@ class SkylightCalendarCard extends HTMLElement {
         font-weight: 500;
         line-height: 1.3;
       }
+
+      .week-compact-event-location {
+        font-size: var(--event-location-font-size, 9px);
+        opacity: 0.9;
+        margin-top: 4px;
+        line-height: 1.3;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       
       /* Week Standard View Styles */
 
@@ -2218,6 +2231,22 @@ class SkylightCalendarCard extends HTMLElement {
         font-size: var(--event-time-font-size, 9px);
         font-weight: 500;
         opacity: 0.85;
+      }
+
+      .week-standard-event-location {
+        font-size: var(--event-location-font-size, 9px);
+        opacity: 0.9;
+        margin-top: 4px;
+        line-height: 1.3;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .week-standard-event-calendar-name {
+        font-size: 10px;
+        font-weight: 600;
+        opacity: 0.9;
       }
       
       .week-standard-event-icons {
@@ -3262,9 +3291,10 @@ class SkylightCalendarCard extends HTMLElement {
                   const eventStyle = this.getEventStyle(event);
                   
                   return `
-                    <div class="week-compact-event" style="${eventStyle} --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-time-font-size: ${this.getEventTimeFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
+                    <div class="week-compact-event" style="${eventStyle} --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-time-font-size: ${this.getEventTimeFontSize()}; --event-location-font-size: ${this.getEventLocationFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
                       <div class="week-compact-event-time">${timeLabel}</div>
                       <div class="week-compact-event-title">${this.escapeHtml(event.summary || this.t('untitledEvent'))}</div>
+                      ${this.shouldShowEventLocation(event) ? `<div class="week-compact-event-location">📍 ${this.escapeHtml(event.location)}</div>` : ''}
                     </div>
                   `;
                 }).join('')}
@@ -3528,10 +3558,11 @@ class SkylightCalendarCard extends HTMLElement {
       
       return `
         <div class="week-standard-event" 
-             style="top: ${top}px; height: ${height}px; width: ${width}; left: ${left}; ${eventStyle} --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-time-font-size: ${this.getEventTimeFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};"
+             style="top: ${top}px; height: ${height}px; width: ${width}; left: ${left}; ${eventStyle} --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-time-font-size: ${this.getEventTimeFontSize()}; --event-location-font-size: ${this.getEventLocationFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};"
              data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
           <div class="week-standard-event-title">${this.escapeHtml(event.summary || this.t('untitledEvent'))}</div>
           ${this.shouldShowEventTime(event) ? `<div class="week-standard-event-time">${this.formatScheduleTime(eventStart)} - ${this.formatScheduleTime(eventEnd)}</div>` : ''}
+          ${this.shouldShowEventLocation(event) ? `<div class="week-standard-event-location">📍 ${this.escapeHtml(event.location)}</div>` : ''}
           ${this.renderEventIcon(event)}
         </div>
       `;
@@ -3561,6 +3592,19 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   renderEventIcon(event) {
+    if (this._config.event_calendar_friendly_name) {
+      const visibleBadges = this.getVisibleCalendarBadgesForEvent(event);
+      if (visibleBadges.length === 0) {
+        return '';
+      }
+
+      const namesHtml = visibleBadges
+        .map(calendar => `<div class="week-standard-event-calendar-name">${this.escapeHtml(this.getCalendarName(calendar.entityId))}</div>`)
+        .join('');
+
+      return `<div class="week-standard-event-icons">${namesHtml}</div>`;
+    }
+
     if (this._config.hide_event_calendar_bubble) {
       return '';
     }
@@ -3622,6 +3666,25 @@ class SkylightCalendarCard extends HTMLElement {
     const normalized = String(configuredSize).trim();
     if (!normalized) return '9px';
     return /^\d+(\.\d+)?$/.test(normalized) ? `${normalized}px` : normalized;
+  }
+
+  getEventLocationFontSize() {
+    const configuredSize = this._config?.event_location_font_size;
+    if (configuredSize === undefined || configuredSize === null || configuredSize === '') {
+      return '9px';
+    }
+
+    if (typeof configuredSize === 'number' && Number.isFinite(configuredSize)) {
+      return `${configuredSize}px`;
+    }
+
+    const normalized = String(configuredSize).trim();
+    if (!normalized) return '9px';
+    return /^\d+(\.\d+)?$/.test(normalized) ? `${normalized}px` : normalized;
+  }
+
+  shouldShowEventLocation(event) {
+    return !!(this._config.show_event_location && event?.location);
   }
 
   getEventBubbleFontColor(event) {
@@ -6143,9 +6206,10 @@ class SkylightCalendarCard extends HTMLElement {
               const { segmentStart, isAllDaySegment } = daySegment;
               const timeLabel = isAllDaySegment ? this.t('allDay') : this.formatTime(segmentStart);
               return `
-                <div class="week-compact-event" style="background: ${event.color}; --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-time-font-size: ${this.getEventTimeFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
+                <div class="week-compact-event" style="background: ${event.color}; --event-bubble-font-size: ${this.getEventBubbleFontSize()}; --event-time-font-size: ${this.getEventTimeFontSize()}; --event-location-font-size: ${this.getEventLocationFontSize()}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
                   <div class="week-compact-event-time">${timeLabel}</div>
                   <div class="week-compact-event-title">${this.escapeHtml(event.summary || this.t('untitledEvent'))}</div>
+                  ${this.shouldShowEventLocation(event) ? `<div class="week-compact-event-location">📍 ${this.escapeHtml(event.location)}</div>` : ''}
                 </div>
               `;
             }).join('') : `<div class="empty-state-subtext">${this.t('noEvents')}</div>`}
@@ -6321,6 +6385,9 @@ class SkylightCalendarCard extends HTMLElement {
       show_all_events_month: false,
       compact_width: false,
       show_current_time_bar: false,
+      show_event_location: false,
+      event_location_font_size: 9,
+      event_calendar_friendly_name: false,
       combine_style: 'bars',
       combine_background: 'primary',
       hide_calendars: false,
@@ -6462,6 +6529,18 @@ class SkylightCalendarCardEditor extends HTMLElement {
     return value || 'month';
   }
 
+  getEventCalendarBubbleMode() {
+    if (this._config.event_calendar_friendly_name) {
+      return 'friendly_name';
+    }
+
+    if (this._config.hide_event_calendar_bubble) {
+      return 'none';
+    }
+
+    return 'icon';
+  }
+
   getMapFieldValue(key) {
     const value = this._config[key];
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -6484,6 +6563,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
       height_scale: 1,
       event_font_size: 11,
       event_time_font_size: 9,
+      event_location_font_size: 9,
       combine_calendars_width: 18,
       max_events: 0,
       first_day_of_week: 0
@@ -6958,13 +7038,30 @@ class SkylightCalendarCardEditor extends HTMLElement {
           <input id="event_time_font_size" data-field="event_time_font_size" data-type="number" type="number" min="8" max="32" value="${Number(this._config.event_time_font_size ?? this.getEditorDefaultValue('event_time_font_size'))}">
         </div>
       </div>
+      <div class="field-row">
+        <div class="field field-inline">
+          <label for="event_location_font_size">Event location font size</label>
+          <input id="event_location_font_size" data-field="event_location_font_size" data-type="number" type="number" min="8" max="32" value="${Number(this._config.event_location_font_size ?? this.getEditorDefaultValue('event_location_font_size'))}">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field field-inline">
+          <label for="event_calendar_bubble_mode">Event calendar bubble</label>
+          <select id="event_calendar_bubble_mode" data-field="event_calendar_bubble_mode">
+            <option value="icon" ${this.getEventCalendarBubbleMode() === 'icon' ? 'selected' : ''}>Icon</option>
+            <option value="friendly_name" ${this.getEventCalendarBubbleMode() === 'friendly_name' ? 'selected' : ''}>Friendly Name</option>
+            <option value="none" ${this.getEventCalendarBubbleMode() === 'none' ? 'selected' : ''}>None</option>
+          </select>
+        </div>
+      </div>
       ${this.renderSubSection('Hide times for calendars', `<div class="list-checkbox-grid">${this.renderCalendarListCheckboxes('hide_times_for_calendars', { label: 'hidden times calendars' })}</div>`)}
       <div class="boolean-list">
         <label><input type="checkbox" data-field="show_current_time_bar" ${this._config.show_current_time_bar ? 'checked' : ''}> Show current time bar</label>
         <label><input type="checkbox" data-field="use_24hr_schedule" ${this._config.use_24hr_schedule ? 'checked' : ''}> Use 24-hour schedule time</label>
-        <label><input type="checkbox" data-field="hide_event_calendar_bubble" ${this._config.hide_event_calendar_bubble ? 'checked' : ''}> Hide event calendar bubble</label>
+        <label><input type="checkbox" data-field="show_event_location" ${this._config.show_event_location ? 'checked' : ''}> Show event location</label>
         <label><input type="checkbox" data-field="combine_calendars" ${this._config.combine_calendars ? 'checked' : ''}> Combine duplicate events across calendars</label>
       </div>
+      ${this._config.combine_calendars ? `
       <div class="field-row">
         <div class="field field-inline">
           <label for="combine_style">Combined indicator style</label>
@@ -6999,6 +7096,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
           <input id="combine_calendars_width" data-field="combine_calendars_width" data-type="number" type="number" min="1" value="${Number(this._config.combine_calendars_width ?? this.getEditorDefaultValue('combine_calendars_width'))}">
         </div>
       </div>
+      ` : ''}
     `);
 
     const managementSection = this.renderSection('Event management', `
@@ -7577,6 +7675,11 @@ class SkylightCalendarCardEditor extends HTMLElement {
       const field = select.dataset.field;
       if (field === 'default_view') return;
       if (field === 'first_day_of_week') return;
+      if (field === 'event_calendar_bubble_mode') {
+        select.value = this.getEventCalendarBubbleMode();
+        return;
+      }
+
       if (field === 'combine_background_mode') {
         select.value = this._combineBackgroundMode;
         return;
@@ -7631,6 +7734,30 @@ class SkylightCalendarCardEditor extends HTMLElement {
   handleChange(event) {
     const field = event.target.dataset.field;
     const nextConfig = { ...this.value };
+
+    if (field === 'event_calendar_bubble_mode') {
+      const selectedMode = event.target.value;
+      if (selectedMode === 'friendly_name') {
+        nextConfig.event_calendar_friendly_name = true;
+        nextConfig.hide_event_calendar_bubble = false;
+      } else if (selectedMode === 'none') {
+        nextConfig.event_calendar_friendly_name = false;
+        nextConfig.hide_event_calendar_bubble = true;
+      } else {
+        nextConfig.event_calendar_friendly_name = false;
+        nextConfig.hide_event_calendar_bubble = false;
+      }
+
+      this._config = nextConfig;
+      this.dispatchEvent(
+        new CustomEvent('config-changed', {
+          detail: { config: nextConfig },
+          bubbles: true,
+          composed: true
+        })
+      );
+      return;
+    }
 
     if (field === 'combine_background_mode') {
       this._combineBackgroundMode = event.target.value;
@@ -7709,7 +7836,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
       nextConfig.week_days = selectedWeekdays;
     } else if (event.target.type === 'checkbox') {
       nextConfig[field] = event.target.checked;
-      if (field === 'compact_height') {
+      if (field === 'compact_height' || field === 'combine_calendars') {
         this._config = nextConfig;
         this.render();
         this.dispatchEvent(
