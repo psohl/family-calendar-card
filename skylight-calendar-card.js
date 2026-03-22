@@ -499,6 +499,16 @@ class SkylightCalendarCard extends HTMLElement {
     this._activeLanguage = DEFAULT_LANGUAGE;
     this._hasCustomTitle = false;
     this._isDarkMode = false;
+    this._themeMode = 'auto';
+    this._systemThemeMediaQuery = null;
+    this._handleSystemThemeChange = (event) => {
+      if (this._themeMode !== 'auto') {
+        return;
+      }
+
+      this._isDarkMode = !!event.matches;
+      this.render();
+    };
     this._weekStandardFixedOffsetHeight = null;
     this._weekStandardContainerTopInViewport = null;
     this._monthContainerTopInViewport = null;
@@ -546,6 +556,65 @@ class SkylightCalendarCard extends HTMLElement {
     return `skylight-calendar-card:${dashboardScope}:${baseKey}`;
   }
 
+  normalizeDefaultDarkMode(value) {
+    if (value === true) return 'dark';
+    if (value === false || value === undefined || value === null || value === '') return 'auto';
+
+    const normalizedValue = String(value).trim().toLowerCase();
+    if (['auto', 'light', 'dark'].includes(normalizedValue)) {
+      return normalizedValue;
+    }
+
+    return 'auto';
+  }
+
+  applyThemeMode(mode = this._themeMode) {
+    this._themeMode = this.normalizeDefaultDarkMode(mode);
+
+    if (this._themeMode === 'dark') {
+      this._isDarkMode = true;
+      return;
+    }
+
+    if (this._themeMode === 'light') {
+      this._isDarkMode = false;
+      return;
+    }
+
+    const mediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
+    this._isDarkMode = !!mediaQuery?.matches;
+  }
+
+  attachSystemThemeListener() {
+    const mediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!mediaQuery || this._systemThemeMediaQuery === mediaQuery) {
+      return;
+    }
+
+    this.detachSystemThemeListener();
+    this._systemThemeMediaQuery = mediaQuery;
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', this._handleSystemThemeChange);
+    } else if (typeof mediaQuery.addListener === 'function') {
+      mediaQuery.addListener(this._handleSystemThemeChange);
+    }
+  }
+
+  detachSystemThemeListener() {
+    if (!this._systemThemeMediaQuery) {
+      return;
+    }
+
+    if (typeof this._systemThemeMediaQuery.removeEventListener === 'function') {
+      this._systemThemeMediaQuery.removeEventListener('change', this._handleSystemThemeChange);
+    } else if (typeof this._systemThemeMediaQuery.removeListener === 'function') {
+      this._systemThemeMediaQuery.removeListener(this._handleSystemThemeChange);
+    }
+
+    this._systemThemeMediaQuery = null;
+  }
+
   loadPersistedPreferences() {
     const storageKey = this.getPreferenceStorageKey();
     if (!storageKey) return;
@@ -555,10 +624,6 @@ class SkylightCalendarCard extends HTMLElement {
       if (!raw) return;
 
       const parsed = JSON.parse(raw);
-
-      if (typeof parsed.isDarkMode === 'boolean') {
-        this._isDarkMode = parsed.isDarkMode;
-      }
 
       if (Array.isArray(parsed.hiddenCalendars)) {
         const knownEntities = new Set(this._config.entities || []);
@@ -575,7 +640,6 @@ class SkylightCalendarCard extends HTMLElement {
 
     try {
       const payload = {
-        isDarkMode: this._isDarkMode,
         hiddenCalendars: Array.from(this._hiddenCalendars)
       };
       window.localStorage?.setItem(storageKey, JSON.stringify(payload));
@@ -719,13 +783,14 @@ class SkylightCalendarCard extends HTMLElement {
       readonly_calendars: config.readonly_calendars || [], // Calendars that should not allow modifications
       language: config.language || null, // Language code for translations (e.g., 'en', 'de', 'fr')
       locale: config.locale || null, // Locale override for date/time formatting (e.g., 'en-US')
-      default_dark_mode: config.default_dark_mode ?? config.dark_mode ?? false, // Start in dark mode on initial load
+      color_scheme: this.normalizeDefaultDarkMode(config.color_scheme), // Controls theme mode on initial load: auto, light, or dark
       preference_storage_key: config.preference_storage_key || null, // Optional key to isolate saved preferences per card
       ...config,
-      default_view: normalizedDefaultView || 'month' // Re-apply normalization after spread for legacy values
+      default_view: normalizedDefaultView || 'month', // Re-apply normalization after spread for legacy values
+      color_scheme: this.normalizeDefaultDarkMode(config.color_scheme) // Re-apply normalization after spread for color scheme values
     };
     this._viewMode = this._config.default_view;
-    this._isDarkMode = !!this._config.default_dark_mode;
+    this.applyThemeMode(this._config.color_scheme);
     this._hiddenCalendars = new Set(
       Array.from(previousHiddenCalendars).filter((entityId) => this._config.entities.includes(entityId))
     );
@@ -1299,12 +1364,14 @@ class SkylightCalendarCard extends HTMLElement {
   connectedCallback() {
     window.addEventListener('resize', this._handleViewportResize);
     window.visualViewport?.addEventListener('resize', this._handleViewportResize);
+    this.attachSystemThemeListener();
     this.render();
   }
 
   disconnectedCallback() {
     window.removeEventListener('resize', this._handleViewportResize);
     window.visualViewport?.removeEventListener('resize', this._handleViewportResize);
+    this.detachSystemThemeListener();
   }
 
   getCompactMaxHeight(containerTopInViewport = null) {
@@ -1474,6 +1541,15 @@ class SkylightCalendarCard extends HTMLElement {
         overflow: hidden;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         width: 100%;
+        color-scheme: light;
+      }
+
+      .calendar-container,
+      .calendar-container input,
+      .calendar-container select,
+      .calendar-container textarea,
+      .calendar-container button {
+        color-scheme: light;
       }
 
       .header {
@@ -2851,6 +2927,15 @@ class SkylightCalendarCard extends HTMLElement {
       .calendar-container.dark-mode {
         background: #2a2f36;
         color: #e8ecf1;
+        color-scheme: dark;
+      }
+
+      .calendar-container.dark-mode,
+      .calendar-container.dark-mode input,
+      .calendar-container.dark-mode select,
+      .calendar-container.dark-mode textarea,
+      .calendar-container.dark-mode button {
+        color-scheme: dark;
       }
 
       .calendar-container.dark-mode .week-standard-container,
@@ -4574,7 +4659,7 @@ class SkylightCalendarCard extends HTMLElement {
     });
 
     themeToggleButton?.addEventListener('click', () => {
-      this._isDarkMode = !this._isDarkMode;
+      this.applyThemeMode(this._isDarkMode ? 'light' : 'dark');
       this.persistPreferences();
       this.render();
     });
@@ -6690,6 +6775,7 @@ class SkylightCalendarCard extends HTMLElement {
       hide_calendars: false,
       hide_controls: false,
       hide_dark_mode_toggle: false,
+      color_scheme: 'auto',
       enable_event_management: true
     };
   }
@@ -6773,7 +6859,8 @@ class SkylightCalendarCardEditor extends HTMLElement {
     this._config = {
       ...SkylightCalendarCard.getStubConfig(),
       ...config,
-      default_view: normalizedDefaultView || (SkylightCalendarCard.getStubConfig().default_view || 'month')
+      default_view: normalizedDefaultView || (SkylightCalendarCard.getStubConfig().default_view || 'month'),
+      color_scheme: SkylightCalendarCard.prototype.normalizeDefaultDarkMode(config.color_scheme)
     };
     this.syncCombineBackgroundEditorState(this._config.combine_background);
 
@@ -7288,8 +7375,15 @@ class SkylightCalendarCardEditor extends HTMLElement {
       ${this.renderSubSection('Calendar badge icons', `<div class="map-grid">${this.renderMapRowInputs('calendar_badge_icons', { label: 'badge icons', placeholder: 'mdi:icon or URL' })}</div>`)}
       <div class="boolean-list">
         <label><input type="checkbox" data-field="background_transparent" ${this._config.background_transparent ? 'checked' : ''}> Transparent background surfaces</label>
-        <label><input type="checkbox" data-field="default_dark_mode" ${this._config.default_dark_mode ? 'checked' : ''}> Default dark mode</label>
         <label><input type="checkbox" data-field="hide_dark_mode_toggle" ${this._config.hide_dark_mode_toggle ? 'checked' : ''}> Hide dark mode toggle</label>
+      </div>
+      <div class="field">
+        <label for="color_scheme">Color scheme</label>
+        <select id="color_scheme" data-field="color_scheme">
+          <option value="auto">Auto (browser/app)</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
       </div>
     `);
 
