@@ -5175,9 +5175,7 @@ class SkylightCalendarCard extends HTMLElement {
                        value="${formatDateTimeLocal(startTime)}" required />
               </div>
             </div>
-          </div>
 
-          <div id="timed-event-fields">
             <div class="form-group form-group-inline">
               <div class="form-inline-row">
                 <label class="form-label">${this.t('end')}</label>
