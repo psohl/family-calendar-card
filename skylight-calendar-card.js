@@ -3265,6 +3265,12 @@ class SkylightCalendarCard extends HTMLElement {
         ${this.getStyles()}
       </style>
 
+      ${this._config.uix?.style ? `
+        <style class="uix-style">
+          ${this._config.uix.style}
+        </style>
+      ` : ''}
+
       <div class="calendar-container ${this._isDarkMode ? 'dark-mode' : ''} ${hasCustomBackground ? 'custom-background' : ''}" style="${containerStyle}">
         ${this._config.compact_header ? this.renderCompactHeader() : this.renderStandardHeader()}
 
