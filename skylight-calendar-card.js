@@ -3235,7 +3235,7 @@ class SkylightCalendarCard extends HTMLElement {
 
 
       .calendar-container.dark-mode {
-        background: #2a2f36;
+        background-color: var(--calendar-background, #2a2f36);
         color: #e8ecf1;
         color-scheme: dark;
       }
