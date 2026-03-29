@@ -836,10 +836,19 @@ class SkylightCalendarCard extends HTMLElement {
   set hass(hass) {
     const oldHass = this._hass;
     this._hass = hass;
+    let shouldRender = false;
 
     // Check calendar capabilities when hass is set
     if (!oldHass || this._hass !== oldHass) {
       this.checkAllCalendarCapabilities();
+    }
+
+    if (this._themeMode === 'auto') {
+      const hassDarkMode = this._hass?.themes?.darkMode;
+      if (typeof hassDarkMode === 'boolean' && this._isDarkMode !== hassDarkMode) {
+        this._isDarkMode = hassDarkMode;
+        shouldRender = true;
+      }
     }
 
     const resolvedLanguage = this.getLanguage();
@@ -848,6 +857,10 @@ class SkylightCalendarCard extends HTMLElement {
       if (!this._hasCustomTitle) {
         this._config.title = translate(this._activeLanguage, 'defaultTitle');
       }
+      shouldRender = true;
+    }
+
+    if (shouldRender) {
       this.render();
     }
 
