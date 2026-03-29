@@ -1721,7 +1721,8 @@ class SkylightCalendarCard extends HTMLElement {
 
   getStyles() {
     return `
-      :host {
+      :host,
+      skylight-calendar-card {
         display: block;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
         width: 100%;
@@ -1746,6 +1747,7 @@ class SkylightCalendarCard extends HTMLElement {
       .calendar-container textarea,
       .calendar-container button {
         color-scheme: light;
+        font-family: inherit;
       }
 
       .header {
