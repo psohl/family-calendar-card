@@ -1623,6 +1623,48 @@ class SkylightCalendarCard extends HTMLElement {
     });
   }
 
+  getAgendaViewportDayCapacity() {
+    if (!this._root || this._viewMode !== 'agenda') {
+      return this._agendaDaysPerScrollLoad;
+    }
+
+    const container = this.getRootElementById('agenda-container');
+    if (!container) {
+      return this._agendaDaysPerScrollLoad;
+    }
+
+    const rows = Array.from(container.querySelectorAll('.agenda-day-row'));
+    if (rows.length === 0) {
+      return this._agendaDaysPerScrollLoad;
+    }
+
+    const maxHeight = container.clientHeight;
+    if (!Number.isFinite(maxHeight) || maxHeight <= 0) {
+      return this._agendaDaysPerScrollLoad;
+    }
+
+    let consumedHeight = 0;
+    let dayCount = 0;
+
+    for (const row of rows) {
+      const rowHeight = row.getBoundingClientRect().height;
+      if (!Number.isFinite(rowHeight) || rowHeight <= 0) continue;
+
+      if ((consumedHeight + rowHeight) > maxHeight && dayCount > 0) {
+        break;
+      }
+
+      consumedHeight += rowHeight;
+      dayCount += 1;
+
+      if (consumedHeight >= maxHeight) {
+        break;
+      }
+    }
+
+    return Math.max(1, dayCount || this._agendaDaysPerScrollLoad);
+  }
+
   getRollingDaysForView(viewMode = this._viewMode) {
     if (viewMode === 'week-compact' && this._config.rolling_days_week_compact !== null) {
       return this._config.rolling_days_week_compact;
@@ -5108,22 +5150,11 @@ class SkylightCalendarCard extends HTMLElement {
     prevButton?.addEventListener('click', () => {
       if (this._viewMode === 'agenda') {
         this.ensureAgendaWindowInitialized();
-        const dayMs = 24 * 60 * 60 * 1000;
-        const windowSpanDays = Math.max(0, Math.round((this._agendaEndDate.getTime() - this._agendaStartDate.getTime()) / dayMs));
-        const visibleRange = this.getAgendaVisibleDateRangeFromDom() || (
-          this._agendaVisibleStartDate && this._agendaVisibleEndDate
-            ? { startDate: this._agendaVisibleStartDate, endDate: this._agendaVisibleEndDate }
-            : null
-        );
-        const targetEnd = visibleRange ? new Date(visibleRange.startDate) : new Date(this._agendaStartDate);
-        targetEnd.setHours(23, 59, 59, 999);
-
-        const targetStart = new Date(targetEnd);
-        targetStart.setDate(targetStart.getDate() - windowSpanDays);
-        targetStart.setHours(0, 0, 0, 0);
-
-        this._agendaStartDate = targetStart;
-        this._agendaEndDate = targetEnd;
+        const backwardDays = this.getAgendaViewportDayCapacity();
+        this._agendaStartDate.setDate(this._agendaStartDate.getDate() - backwardDays);
+        this._agendaStartDate.setHours(0, 0, 0, 0);
+        this._agendaEndDate.setDate(this._agendaEndDate.getDate() - backwardDays);
+        this._agendaEndDate.setHours(23, 59, 59, 999);
       } else if (this._viewMode === 'month') {
         if (this._config.rolling_weeks !== null) {
           // In rolling weeks mode, go back by the number of weeks shown
