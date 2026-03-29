@@ -1884,31 +1884,41 @@ class SkylightCalendarCard extends HTMLElement {
       }
 
       .view-mode-buttons {
-        display: flex;
-        gap: 4px;
-        background: var(--header-control-bg, rgba(255, 255, 255, 0.15));
-        padding: 4px;
+        display: inline-flex;
+        align-items: center;
+        background: var(--header-control-bg, rgba(255, 255, 255, 0.2));
         border-radius: 8px;
+        padding: 0 10px;
+        margin-left: 8px;
+        position: relative;
       }
 
-      .view-mode-button {
+      .view-mode-buttons::after {
+        content: "⌄";
+        font-size: 13px;
+        pointer-events: none;
+        margin-left: 8px;
+        opacity: 0.8;
+      }
+
+      .view-mode-select {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
         background: transparent;
         border: none;
         color: inherit;
-        padding: 6px 12px;
-        border-radius: 6px;
+        padding: 8px 0;
+        padding-right: 2px;
         cursor: pointer;
         font-size: 13px;
         font-weight: 500;
-        transition: background 0.2s;
+        line-height: 1;
+        min-width: 78px;
       }
 
-      .view-mode-button:hover {
-        background: var(--header-control-bg-hover, rgba(255, 255, 255, 0.15));
-      }
-
-      .view-mode-button.active {
-        background: var(--header-control-bg-active, rgba(255, 255, 255, 0.3));
+      .view-mode-select:focus {
+        outline: none;
       }
 
       .nav-button {
@@ -3416,8 +3426,8 @@ class SkylightCalendarCard extends HTMLElement {
         border-color: rgba(226, 232, 240, 0.28);
       }
 
-      .calendar-container.dark-mode .view-mode-button.active {
-        background: rgba(226, 232, 240, 0.24);
+      .calendar-container.dark-mode .view-mode-select {
+        color: #f8fafc;
       }
 
       .calendar-container.dark-mode .week-day-header,
@@ -3617,13 +3627,13 @@ class SkylightCalendarCard extends HTMLElement {
           <div class="header-controls">
             ${canAddEvents ? `<button class="add-event-button" id="add-event-btn"><span class="icon">+</span>${this.t('addEvent')}</button>` : ''}
             ${this.renderThemeToggle()}
-            ${this.renderViewModeButtons()}
             <div class="period-controls">
               <button class="nav-button" id="prev-period">‹</button>
               <div class="month-year">${this.getPeriodLabel()}</div>
               <button class="nav-button" id="next-period">›</button>
               <button class="today-button" id="today">${this.t('today')}</button>
             </div>
+            ${this.renderViewModeButtons()}
           </div>
         ` : ''}
       </div>
@@ -3646,13 +3656,13 @@ class SkylightCalendarCard extends HTMLElement {
           <div class="header-controls compact-header-controls">
             ${canAddEvents ? `<button class="compact-add-event-button" id="add-event-btn"><span class="icon">+</span>${this.t('addEvent')}</button>` : ''}
             ${this.renderThemeToggle()}
-            ${this.renderViewModeButtons()}
             <div class="compact-period-controls">
               <button class="nav-button" id="prev-period">‹</button>
               <div class="month-year">${this.getPeriodLabel()}</div>
               <button class="nav-button" id="next-period">›</button>
               <button class="today-button" id="today">${this.t('today')}</button>
             </div>
+            ${this.renderViewModeButtons()}
           </div>
         ` : ''}
       </div>
@@ -3689,10 +3699,12 @@ class SkylightCalendarCard extends HTMLElement {
   renderViewModeButtons() {
     return `
       <div class="view-mode-buttons">
-        <button class="view-mode-button ${this._viewMode === 'month' ? 'active' : ''}" data-view="month">${this.t('month')}</button>
-        <button class="view-mode-button ${this._viewMode === 'week-compact' ? 'active' : ''}" data-view="week-compact">${this.t('week')}</button>
-        <button class="view-mode-button ${this._viewMode === 'week-standard' ? 'active' : ''}" data-view="week-standard">${this.t('schedule')}</button>
-        <button class="view-mode-button ${this._viewMode === 'agenda' ? 'active' : ''}" data-view="agenda">${this.t('agenda')}</button>
+        <select class="view-mode-select" id="view-mode-select" aria-label="Select calendar view">
+          <option value="month" ${this._viewMode === 'month' ? 'selected' : ''}>${this.t('month')}</option>
+          <option value="week-compact" ${this._viewMode === 'week-compact' ? 'selected' : ''}>${this.t('week')}</option>
+          <option value="week-standard" ${this._viewMode === 'week-standard' ? 'selected' : ''}>${this.t('schedule')}</option>
+          <option value="agenda" ${this._viewMode === 'agenda' ? 'selected' : ''}>${this.t('agenda')}</option>
+        </select>
       </div>
     `;
   }
@@ -5110,17 +5122,16 @@ class SkylightCalendarCard extends HTMLElement {
     const modal = this.getRootElementById('event-modal');
     const agendaContainer = this.getRootElementById('agenda-container');
 
-    // View mode buttons
-    this._root.querySelectorAll('.view-mode-button').forEach(button => {
-      button.addEventListener('click', () => {
-        this._viewMode = button.getAttribute('data-view');
-        if (this._viewMode === 'agenda') {
-          this.resetAgendaWindowToToday();
-        } else {
-          this.setWeekStart();
-        }
-        this.ensureEventsForCurrentRange({ renderIfCovered: true });
-      });
+    // View mode selector
+    const viewModeSelect = this.getRootElementById('view-mode-select');
+    viewModeSelect?.addEventListener('change', () => {
+      this._viewMode = viewModeSelect.value;
+      if (this._viewMode === 'agenda') {
+        this.resetAgendaWindowToToday();
+      } else {
+        this.setWeekStart();
+      }
+      this.ensureEventsForCurrentRange({ renderIfCovered: true });
     });
 
     const calendarBadgesStrip = this._root.querySelector('.calendar-badges');
@@ -8429,6 +8440,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
             <option value="month" ${this.normalizeDefaultViewForEditor(this._config.default_view) === 'month' ? 'selected' : ''}>Month</option>
             <option value="week-compact" ${this.normalizeDefaultViewForEditor(this._config.default_view) === 'week-compact' ? 'selected' : ''}>Week</option>
             <option value="week-standard" ${this.normalizeDefaultViewForEditor(this._config.default_view) === 'week-standard' ? 'selected' : ''}>Schedule</option>
+            <option value="agenda" ${this.normalizeDefaultViewForEditor(this._config.default_view) === 'agenda' ? 'selected' : ''}>Agenda</option>
           </select>
         </div>
 
