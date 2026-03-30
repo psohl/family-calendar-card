@@ -1721,7 +1721,8 @@ class SkylightCalendarCard extends HTMLElement {
 
   getStyles() {
     return `
-      :host {
+      :host,
+      skylight-calendar-card {
         display: block;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
         width: 100%;
@@ -1746,6 +1747,7 @@ class SkylightCalendarCard extends HTMLElement {
       .calendar-container textarea,
       .calendar-container button {
         color-scheme: light;
+        font-family: inherit;
       }
 
       .header {
@@ -1919,6 +1921,11 @@ class SkylightCalendarCard extends HTMLElement {
 
       .view-mode-select:focus {
         outline: none;
+      }
+
+      .view-mode-select option {
+        color: #111827;
+        background: #ffffff;
       }
 
       .nav-button {
@@ -3428,6 +3435,11 @@ class SkylightCalendarCard extends HTMLElement {
 
       .calendar-container.dark-mode .view-mode-select {
         color: #f8fafc;
+      }
+
+      .calendar-container.dark-mode .view-mode-select option {
+        color: #f8fafc;
+        background: #1f2937;
       }
 
       .calendar-container.dark-mode .week-day-header,
