@@ -527,6 +527,10 @@ class SkylightCalendarCard extends HTMLElement {
     this._agendaVisibleEndDate = null;
     this._agendaDaysPerScrollLoad = 7;
     this._agendaScrollLoadLock = false;
+    this._swipeStartX = null;
+    this._swipeStartY = null;
+    this._swipeTracking = false;
+    this._swipeStartedOnInteractive = false;
     this._activeModalBackHandler = null;
     this._combinedEditTargets = null;
     this._combinedDeleteTargets = null;
@@ -781,6 +785,7 @@ class SkylightCalendarCard extends HTMLElement {
       rolling_days_schedule: config.rolling_days_schedule ?? null, // If set, schedule week view shows current day + N days instead of week_days
       rolling_weeks: config.rolling_weeks || null, // If set, show current week + N weeks in month view
       show_all_events_month: config.show_all_events_month || false, // In month view, show all events and allow week rows to grow while keeping row minimum height
+      disable_swipe_controls: config.disable_swipe_controls ?? false, // Disable left/right swipe period navigation
       week_start_hour: normalizedWeekStartHour, // Start hour for week-standard view
       week_end_hour: normalizedWeekEndHour, // End hour for week-standard view
       lock_schedule_hours: config.lock_schedule_hours ?? false, // Keep schedule hours fixed even when events are outside the configured range
@@ -5215,78 +5220,8 @@ class SkylightCalendarCard extends HTMLElement {
       this.render();
     });
 
-    prevButton?.addEventListener('click', () => {
-      if (this._viewMode === 'agenda') {
-        this.ensureAgendaWindowInitialized();
-        const backwardDays = this.getAgendaViewportDayCapacity();
-        this._agendaStartDate.setDate(this._agendaStartDate.getDate() - backwardDays);
-        this._agendaStartDate.setHours(0, 0, 0, 0);
-        this._agendaEndDate.setDate(this._agendaEndDate.getDate() - backwardDays);
-        this._agendaEndDate.setHours(23, 59, 59, 999);
-      } else if (this._viewMode === 'month') {
-        if (this._config.rolling_weeks !== null) {
-          // In rolling weeks mode, go back by the number of weeks shown
-          const weeksToAdvance = this._config.rolling_weeks + 1;
-          this._currentDate.setDate(this._currentDate.getDate() - (weeksToAdvance * 7));
-        } else {
-          // Standard month navigation
-          this._currentDate.setMonth(this._currentDate.getMonth() - 1);
-        }
-      } else {
-        // In rolling-days mode, advance by rolling days + 1, otherwise by 7
-        const rollingDays = this.getRollingDaysForView();
-        const daysToAdvance = rollingDays !== null
-          ? rollingDays + 1
-          : 7;
-        this._currentDate.setDate(this._currentDate.getDate() - daysToAdvance);
-        if (rollingDays === null) {
-          this.setWeekStart();
-        }
-      }
-      this.ensureEventsForCurrentRange({ renderIfCovered: true });
-    });
-
-    nextButton?.addEventListener('click', () => {
-      if (this._viewMode === 'agenda') {
-        this.ensureAgendaWindowInitialized();
-        const dayMs = 24 * 60 * 60 * 1000;
-        const windowSpanDays = Math.max(0, Math.round((this._agendaEndDate.getTime() - this._agendaStartDate.getTime()) / dayMs));
-        const visibleRange = this.getAgendaVisibleDateRangeFromDom() || (
-          this._agendaVisibleStartDate && this._agendaVisibleEndDate
-            ? { startDate: this._agendaVisibleStartDate, endDate: this._agendaVisibleEndDate }
-            : null
-        );
-        const targetStart = visibleRange ? new Date(visibleRange.endDate) : new Date(this._agendaStartDate);
-        targetStart.setHours(0, 0, 0, 0);
-
-        const targetEnd = new Date(targetStart);
-        targetEnd.setDate(targetEnd.getDate() + windowSpanDays);
-        targetEnd.setHours(23, 59, 59, 999);
-
-        this._agendaStartDate = targetStart;
-        this._agendaEndDate = targetEnd;
-      } else if (this._viewMode === 'month') {
-        if (this._config.rolling_weeks !== null) {
-          // In rolling weeks mode, go forward by the number of weeks shown
-          const weeksToAdvance = this._config.rolling_weeks + 1;
-          this._currentDate.setDate(this._currentDate.getDate() + (weeksToAdvance * 7));
-        } else {
-          // Standard month navigation
-          this._currentDate.setMonth(this._currentDate.getMonth() + 1);
-        }
-      } else {
-        // In rolling-days mode, advance by rolling days + 1, otherwise by 7
-        const rollingDays = this.getRollingDaysForView();
-        const daysToAdvance = rollingDays !== null
-          ? rollingDays + 1
-          : 7;
-        this._currentDate.setDate(this._currentDate.getDate() + daysToAdvance);
-        if (rollingDays === null) {
-          this.setWeekStart();
-        }
-      }
-      this.ensureEventsForCurrentRange({ renderIfCovered: true });
-    });
+    prevButton?.addEventListener('click', () => this.navigateToPreviousPeriod());
+    nextButton?.addEventListener('click', () => this.navigateToNextPeriod());
 
     todayButton?.addEventListener('click', () => {
       if (this._viewMode === 'agenda') {
@@ -5329,6 +5264,8 @@ class SkylightCalendarCard extends HTMLElement {
 
       this._agendaScrollLoadLock = false;
     }, { passive: true });
+
+    this.attachSwipeControls();
 
     // Event click handlers for all view modes
     this._root.querySelectorAll('.event, .week-compact-event, .week-standard-event, .all-day-event, .agenda-event').forEach(eventEl => {
@@ -5423,6 +5360,163 @@ class SkylightCalendarCard extends HTMLElement {
         }
       }
     });
+  }
+
+  navigateToPreviousPeriod() {
+    if (this._viewMode === 'agenda') {
+      this.ensureAgendaWindowInitialized();
+      const backwardDays = this.getAgendaViewportDayCapacity();
+      this._agendaStartDate.setDate(this._agendaStartDate.getDate() - backwardDays);
+      this._agendaStartDate.setHours(0, 0, 0, 0);
+      this._agendaEndDate.setDate(this._agendaEndDate.getDate() - backwardDays);
+      this._agendaEndDate.setHours(23, 59, 59, 999);
+    } else if (this._viewMode === 'month') {
+      if (this._config.rolling_weeks !== null) {
+        // In rolling weeks mode, go back by the number of weeks shown
+        const weeksToAdvance = this._config.rolling_weeks + 1;
+        this._currentDate.setDate(this._currentDate.getDate() - (weeksToAdvance * 7));
+      } else {
+        // Standard month navigation
+        this._currentDate.setMonth(this._currentDate.getMonth() - 1);
+      }
+    } else {
+      // In rolling-days mode, advance by rolling days + 1, otherwise by 7
+      const rollingDays = this.getRollingDaysForView();
+      const daysToAdvance = rollingDays !== null
+        ? rollingDays + 1
+        : 7;
+      this._currentDate.setDate(this._currentDate.getDate() - daysToAdvance);
+      if (rollingDays === null) {
+        this.setWeekStart();
+      }
+    }
+    this.ensureEventsForCurrentRange({ renderIfCovered: true });
+  }
+
+  navigateToNextPeriod() {
+    if (this._viewMode === 'agenda') {
+      this.ensureAgendaWindowInitialized();
+      const dayMs = 24 * 60 * 60 * 1000;
+      const windowSpanDays = Math.max(0, Math.round((this._agendaEndDate.getTime() - this._agendaStartDate.getTime()) / dayMs));
+      const visibleRange = this.getAgendaVisibleDateRangeFromDom() || (
+        this._agendaVisibleStartDate && this._agendaVisibleEndDate
+          ? { startDate: this._agendaVisibleStartDate, endDate: this._agendaVisibleEndDate }
+          : null
+      );
+      const targetStart = visibleRange ? new Date(visibleRange.endDate) : new Date(this._agendaStartDate);
+      targetStart.setHours(0, 0, 0, 0);
+
+      const targetEnd = new Date(targetStart);
+      targetEnd.setDate(targetEnd.getDate() + windowSpanDays);
+      targetEnd.setHours(23, 59, 59, 999);
+
+      this._agendaStartDate = targetStart;
+      this._agendaEndDate = targetEnd;
+    } else if (this._viewMode === 'month') {
+      if (this._config.rolling_weeks !== null) {
+        // In rolling weeks mode, go forward by the number of weeks shown
+        const weeksToAdvance = this._config.rolling_weeks + 1;
+        this._currentDate.setDate(this._currentDate.getDate() + (weeksToAdvance * 7));
+      } else {
+        // Standard month navigation
+        this._currentDate.setMonth(this._currentDate.getMonth() + 1);
+      }
+    } else {
+      // In rolling-days mode, advance by rolling days + 1, otherwise by 7
+      const rollingDays = this.getRollingDaysForView();
+      const daysToAdvance = rollingDays !== null
+        ? rollingDays + 1
+        : 7;
+      this._currentDate.setDate(this._currentDate.getDate() + daysToAdvance);
+      if (rollingDays === null) {
+        this.setWeekStart();
+      }
+    }
+    this.ensureEventsForCurrentRange({ renderIfCovered: true });
+  }
+
+  shouldEnableSwipeControls() {
+    return !this._config.disable_swipe_controls && this._viewMode !== 'agenda';
+  }
+
+  canTriggerSwipePeriodNavigation(deltaX) {
+    if (this._viewMode !== 'week-standard') {
+      return true;
+    }
+
+    const scheduleContainer = this._root?.querySelector('.week-standard-container');
+    if (!scheduleContainer) {
+      return true;
+    }
+
+    const maxScrollLeft = Math.max(0, scheduleContainer.scrollWidth - scheduleContainer.clientWidth);
+    if (maxScrollLeft <= 1) {
+      return true;
+    }
+
+    const edgeTolerance = 2;
+    const isAtLeftEdge = scheduleContainer.scrollLeft <= edgeTolerance;
+    const isAtRightEdge = scheduleContainer.scrollLeft >= (maxScrollLeft - edgeTolerance);
+
+    // Swipe left should only paginate when the schedule is already fully scrolled right.
+    if (deltaX < 0) {
+      return isAtRightEdge;
+    }
+
+    // Swipe right should only paginate when the schedule is already fully scrolled left.
+    return isAtLeftEdge;
+  }
+
+  attachSwipeControls() {
+    if (!this._root) return;
+
+    const container = this._root.querySelector('.calendar-container');
+    if (!container) return;
+
+    const swipeThreshold = 48;
+    const maxVerticalDrift = 40;
+
+    container.addEventListener('touchstart', (event) => {
+      if (!this.shouldEnableSwipeControls() || event.touches.length !== 1) return;
+      const touch = event.touches[0];
+      this._swipeStartX = touch.clientX;
+      this._swipeStartY = touch.clientY;
+      this._swipeTracking = true;
+      const eventTarget = event.target instanceof Element ? event.target : null;
+      this._swipeStartedOnInteractive = !!eventTarget?.closest('button, select, input, textarea, .event, .week-compact-event, .week-standard-event, .all-day-event');
+    }, { passive: true });
+
+    container.addEventListener('touchend', (event) => {
+      if (!this._swipeTracking || !this.shouldEnableSwipeControls() || event.changedTouches.length !== 1) return;
+
+      if (this._swipeStartedOnInteractive) {
+        this._swipeTracking = false;
+        this._swipeStartedOnInteractive = false;
+        return;
+      }
+
+      const touch = event.changedTouches[0];
+      const deltaX = touch.clientX - this._swipeStartX;
+      const deltaY = touch.clientY - this._swipeStartY;
+
+      if (Math.abs(deltaX) >= swipeThreshold && Math.abs(deltaY) <= maxVerticalDrift) {
+        if (this.canTriggerSwipePeriodNavigation(deltaX)) {
+          if (deltaX < 0) {
+            this.navigateToNextPeriod();
+          } else {
+            this.navigateToPreviousPeriod();
+          }
+        }
+      }
+
+      this._swipeTracking = false;
+      this._swipeStartedOnInteractive = false;
+    }, { passive: true });
+
+    container.addEventListener('touchcancel', () => {
+      this._swipeTracking = false;
+      this._swipeStartedOnInteractive = false;
+    }, { passive: true });
   }
 
   getRecurrenceWeekdayOptions() {
@@ -7386,6 +7480,7 @@ class SkylightCalendarCard extends HTMLElement {
       week_start_hour: 0,
       week_end_hour: 23,
       lock_schedule_hours: false,
+      disable_swipe_controls: false,
       show_all_events_month: false,
       compact_width: false,
       show_current_time_bar: false,
@@ -7956,6 +8051,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
       </div>
       <div class="boolean-list">
         <label><input type="checkbox" data-field="lock_schedule_hours" ${this._config.lock_schedule_hours ? 'checked' : ''}> Schedule view: lock week start/end hours</label>
+        <label><input type="checkbox" data-field="disable_swipe_controls" ${this._config.disable_swipe_controls ? 'checked' : ''}> Disable swipe period controls</label>
       </div>
       <div class="field-row">
         <div class="field field-inline">
