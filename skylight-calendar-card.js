@@ -542,6 +542,7 @@ class SkylightCalendarCard extends HTMLElement {
     this._weatherForecastSubscriptionInFlightEntityId = null;
     this._weatherForecastSubscriptionGeneration = 0;
     this._weatherForecastRefreshInFlight = false;
+    this._weatherForecastRefreshRetryAtByEntity = new Map();
     this._modalVisibilityObserver = null;
     this._handleViewportResize = () => {
       if (this.isEventManagementDialogOpen()) {
@@ -887,6 +888,7 @@ class SkylightCalendarCard extends HTMLElement {
     if (previousHeaderWeatherSensor !== this._config.header_weather_sensor) {
       this.teardownWeatherForecastSubscription();
       this._weatherForecastByEntity.clear();
+      this._weatherForecastRefreshRetryAtByEntity.clear();
     }
     this.ensureWeatherForecastSubscription();
     this.setWeekStart();
@@ -5174,7 +5176,7 @@ class SkylightCalendarCard extends HTMLElement {
     const gridGap = 1;
     const dayHeaderRowHeight = 41;
     const dayCellVerticalPadding = 16; // .day-cell has 8px top + 8px bottom padding
-    const dayNumberBlockHeight = this._config?.header_weather_sensor ? 40 : 22; // month day header row (with optional forecast)
+    const dayNumberBlockHeight = 42; // .day-header-row min-height in CSS
     const eventRowHeight = this.getMonthEventRowHeight();
 
     const contentHeight = compactMaxHeight - dayHeaderRowHeight - (weekRows * gridGap);
@@ -7977,6 +7979,9 @@ class SkylightCalendarCard extends HTMLElement {
     if (!entityId || !entityId.startsWith('weather.')) return;
     if (!this._hass || this._weatherForecastRefreshInFlight) return;
     if (this._weatherForecastByEntity.has(entityId)) return;
+    const now = Date.now();
+    const retryAt = this._weatherForecastRefreshRetryAtByEntity.get(entityId) || 0;
+    if (retryAt > now) return;
 
     this._weatherForecastRefreshInFlight = true;
     try {
@@ -7989,6 +7994,7 @@ class SkylightCalendarCard extends HTMLElement {
       const dailyForecast = wsResponse?.[entityId]?.forecast;
       if (Array.isArray(dailyForecast)) {
         this._weatherForecastByEntity.set(entityId, dailyForecast);
+        this._weatherForecastRefreshRetryAtByEntity.delete(entityId);
         if (!this.isEventManagementDialogOpen()) {
           this.render();
         } else {
@@ -7997,6 +8003,8 @@ class SkylightCalendarCard extends HTMLElement {
       }
     } catch (error) {
       // forecast websocket may be unavailable in older HA versions; keep graceful fallback paths
+      const retryDelayMs = 5 * 60 * 1000;
+      this._weatherForecastRefreshRetryAtByEntity.set(entityId, now + retryDelayMs);
     } finally {
       this._weatherForecastRefreshInFlight = false;
     }
