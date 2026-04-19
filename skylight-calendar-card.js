@@ -4983,7 +4983,7 @@ class SkylightCalendarCard extends HTMLElement {
 
     weekDays.forEach((date) => {
       this.getEventsForDay(date).forEach((event) => {
-        if (this._hiddenCalendars.has(event.entityId)) {
+        if (this.getVisibleCalendarColorsForEvent(event).length === 0) {
           return;
         }
 
@@ -5016,7 +5016,7 @@ class SkylightCalendarCard extends HTMLElement {
 
     weekDays.forEach((date, dayIndex) => {
       this.getEventsForDay(date).forEach(event => {
-        if (this._hiddenCalendars.has(event.entityId)) {
+        if (this.getVisibleCalendarColorsForEvent(event).length === 0) {
           return;
         }
 
@@ -6004,6 +6004,15 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   getVisibleCalendarColorsForEvent(event) {
+    if (event.isCombinedCalendarEvent && Array.isArray(event.sourceEntityIds)) {
+      const hasVisibleSourceCalendar = event.sourceEntityIds.some((entityId) => !this._hiddenCalendars.has(entityId));
+      if (!hasVisibleSourceCalendar) {
+        return [];
+      }
+    } else if (this._hiddenCalendars.has(event.entityId)) {
+      return [];
+    }
+
     const backgroundColors = this.getEventStyleOverrides(event)?.backgroundColors || [];
     if (backgroundColors.length > 0) {
       return backgroundColors;
