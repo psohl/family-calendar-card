@@ -1571,8 +1571,8 @@ class SkylightCalendarCard extends HTMLElement {
     if (dayStyle.border_color || dayStyle.border_width) {
       const borderWidth = dayStyle.border_width || '2px';
       const borderColor = dayStyle.border_color || 'var(--divider-color, #d1d5db)';
-      styles.push(`border: ${borderWidth} solid ${borderColor} !important`);
-      styles.push('box-sizing: border-box');
+      styles.push(`--day-style-border-width: ${borderWidth}`);
+      styles.push(`--day-style-border-color: ${borderColor}`);
     }
     const classNames = ['day-style-rule'];
     if (dayStyle.background) classNames.push('day-style-has-background');
@@ -2805,6 +2805,27 @@ class SkylightCalendarCard extends HTMLElement {
       .week-standard-day-column.day-style-has-background .day-time-slot,
       .agenda-day-row.day-style-has-background .agenda-day-label {
         background: transparent !important;
+      }
+
+      .day-cell.day-style-has-border,
+      .week-day-column.day-style-has-border,
+      .week-standard-day-column.day-style-has-border,
+      .agenda-day-row.day-style-has-border {
+        position: relative;
+      }
+
+      .day-cell.day-style-has-border::after,
+      .week-day-column.day-style-has-border::after,
+      .week-standard-day-column.day-style-has-border::after,
+      .agenda-day-row.day-style-has-border::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border: var(--day-style-border-width, 2px) solid var(--day-style-border-color, var(--divider-color, #d1d5db));
+        border-radius: inherit;
+        box-sizing: border-box;
+        pointer-events: none;
+        z-index: 2;
       }
 
       .day-number {
