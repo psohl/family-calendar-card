@@ -4553,9 +4553,12 @@ class SkylightCalendarCard extends HTMLElement {
     const month = this._currentDate.getMonth();
 
     const calendarBaseBackground = 'var(--calendar-background, var(--ha-card-background, var(--card-background-color, #ffffff)))';
+    const defaultCalendarSurfaceBackground = this._isDarkMode ? '#30363f' : '#ffffff';
+    const normalizedBackgroundOpacity = this.normalizeBackgroundOpacity(this._config.background_opacity, this._config.background_transparent ? 100 : 0);
+    const hasCustomBackground = normalizedBackgroundOpacity > 0;
     const rawHeaderBackgroundColor = this.normalizeSingleColor(this._config.header_color);
     const resolvedHeaderBackgroundBase = typeof rawHeaderBackgroundColor === 'string' && rawHeaderBackgroundColor.trim().toLowerCase() === 'match-card-background'
-      ? calendarBaseBackground
+      ? (hasCustomBackground ? calendarBaseBackground : defaultCalendarSurfaceBackground)
       : (rawHeaderBackgroundColor || 'var(--primary-color)');
     const normalizedHeaderBackgroundOpacity = this.normalizeBackgroundOpacity(
       this._config.header_background_opacity,
@@ -4577,10 +4580,8 @@ class SkylightCalendarCard extends HTMLElement {
     const backgroundImageStyle = safeBackgroundImageUrl
       ? `--calendar-background-image: url('${safeBackgroundImageUrl}'); --calendar-background-size: ${this._config.background_image_size}; --calendar-background-position: ${this._config.background_image_position}; --calendar-background-repeat: ${this._config.background_image_repeat};`
       : '';
-    const normalizedBackgroundOpacity = this.normalizeBackgroundOpacity(this._config.background_opacity, this._config.background_transparent ? 100 : 0);
     const backgroundAlpha = (100 - normalizedBackgroundOpacity) / 100;
     const backgroundImageAlpha = safeBackgroundImageUrl ? (normalizedBackgroundOpacity / 100) : 0;
-    const hasCustomBackground = normalizedBackgroundOpacity > 0;
     const backgroundStyle = `--calendar-background-opacity: ${backgroundAlpha}; --calendar-background-image-opacity: ${backgroundImageAlpha};`;
     const containerStyle = `${headerStyle} ${backgroundStyle} ${backgroundImageStyle}`.trim();
 
