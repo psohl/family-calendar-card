@@ -109,7 +109,8 @@ const TRANSLATIONS = {
       durationMinute: '{count} minute',
       durationMinutes: '{count} minutes',
       moreEvents: '+{count} more',
-      eventTitleWithStartTime: '{title}, {time}'
+      eventTitleWithStartTime: '{title}, {time}',
+      monthWeekPrefix: 'CW'
     }
   },
 
@@ -213,7 +214,8 @@ const TRANSLATIONS = {
       durationMinute: '{count} minute',
       durationMinutes: '{count} minutes',
       moreEvents: '+{count} de plus',
-      eventTitleWithStartTime: '{title}, {time}'
+      eventTitleWithStartTime: '{title}, {time}',
+      monthWeekPrefix: 'Sem'
     }
   },
 
@@ -317,7 +319,8 @@ const TRANSLATIONS = {
       durationMinute: '{count} Minute',
       durationMinutes: '{count} Minuten',
       moreEvents: '+{count} mehr',
-      eventTitleWithStartTime: '{title}, {time}'
+      eventTitleWithStartTime: '{title}, {time}',
+      monthWeekPrefix: 'KW'
     }
   },
 
@@ -421,7 +424,8 @@ const TRANSLATIONS = {
       durationMinute: '{count} minuut',
       durationMinutes: '{count} minuten',
       moreEvents: '+{count} meer',
-      eventTitleWithStartTime: '{title}, {time}'
+      eventTitleWithStartTime: '{title}, {time}',
+      monthWeekPrefix: 'KW'
     }
   }
 };
@@ -850,6 +854,7 @@ class SkylightCalendarCard extends HTMLElement {
       rolling_days_week_compact: config.rolling_days_week_compact ?? null, // If set, compact week view shows current day + N days instead of week_days
       rolling_days_schedule: config.rolling_days_schedule ?? null, // If set, schedule week view shows current day + N days instead of week_days
       rolling_weeks: config.rolling_weeks || null, // If set, show current week + N weeks in month view
+      show_week_numbers_month: config.show_week_numbers_month || false, // In month view, show ISO 8601 week numbers on the left side
       show_all_events_month: config.show_all_events_month || false, // In month view, show all events and allow week rows to grow while keeping row minimum height
       show_all_details_month: config.show_all_details_month || false, // In month view, render all events with week-compact styling (also implies show_all_events_month behavior)
       hide_the_past: config.hide_the_past || false, // Hide events that ended before the current time
@@ -2745,6 +2750,32 @@ class SkylightCalendarCard extends HTMLElement {
         border-top: 1px solid #e5e7eb;
       }
 
+      .calendar-grid.month-week-numbers {
+        grid-template-columns: 28px repeat(7, 1fr);
+      }
+
+      .month-week-number-header {
+        background: #f9fafb;
+      }
+
+      .month-week-number-cell {
+        background: #f9fafb;
+        color: #6b7280;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px 0;
+      }
+
+      .month-week-number-text {
+        color: inherit;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1;
+        transform: rotate(-90deg);
+        white-space: nowrap;
+      }
+
 
       .calendar-grid.compact-month {
         align-items: stretch;
@@ -4271,7 +4302,9 @@ class SkylightCalendarCard extends HTMLElement {
         border-bottom-color: transparent;
       }
 
-	  .calendar-container.dark-mode .day-header {
+	  .calendar-container.dark-mode .day-header,
+      .calendar-container.dark-mode .month-week-number-header,
+      .calendar-container.dark-mode .month-week-number-cell {
         background: #353b42;
         color: #dde3ea;
         border-color: #556070;
@@ -4470,11 +4503,13 @@ class SkylightCalendarCard extends HTMLElement {
         border-top-color: rgba(var(--custom-surface-column-rgb, 255, 255, 255), var(--custom-surface-alpha, 0.55)) !important;
       }
 
-      .calendar-container.custom-background .day-header {
+      .calendar-container.custom-background .day-header,
+      .calendar-container.custom-background .month-week-number-header {
         background: rgba(var(--custom-surface-all-day-rgb, 249, 250, 251), var(--custom-surface-alpha, 0.55)) !important;
       }
 
-      .calendar-container.custom-background .day-cell {
+      .calendar-container.custom-background .day-cell,
+      .calendar-container.custom-background .month-week-number-cell {
         background: rgba(var(--custom-surface-column-rgb, 255, 255, 255), var(--custom-surface-alpha, 0.55)) !important;
       }
 
@@ -4908,10 +4943,15 @@ class SkylightCalendarCard extends HTMLElement {
       const isCompactMonth = this._config.compact_height && !showAllEventsMonth;
       const compactMaxHeight = isCompactMonth ? this.getCompactMaxHeight(this._monthContainerTopInViewport) : null;
       const monthWeekRows = this.getMonthWeekRowCount();
+      const showMonthWeekNumbers = this.shouldShowMonthWeekNumbers();
       const monthStyle = compactMaxHeight
         ? `height: ${compactMaxHeight}px; overflow-y: auto; grid-template-rows: auto repeat(${monthWeekRows}, minmax(0, 1fr));`
         : '';
-      const monthClass = isCompactMonth ? 'calendar-grid compact-month' : 'calendar-grid';
+      const monthClass = [
+        'calendar-grid',
+        isCompactMonth ? 'compact-month' : '',
+        showMonthWeekNumbers ? 'month-week-numbers' : ''
+      ].filter(Boolean).join(' ');
 
       return `
         ${shouldShowHeaderBadges ? this.renderCalendarBadges() : ''}
@@ -4933,10 +4973,17 @@ class SkylightCalendarCard extends HTMLElement {
     const days = this.getWeekdayNames('short');
     const firstDay = this._config.firstDayOfWeek;
     const orderedDays = [...days.slice(firstDay), ...days.slice(0, firstDay)];
+    const shouldShowWeekNumbers = this.shouldShowMonthWeekNumbers();
 
-    return orderedDays.map(day => `
+    const dayHeaders = orderedDays.map(day => `
       <div class="day-header">${day}</div>
     `).join('');
+
+    if (!shouldShowWeekNumbers) {
+      return dayHeaders;
+    }
+
+    return `<div class="month-week-number-header"></div>${dayHeaders}`;
   }
 
   renderWeekCompact() {
@@ -5883,20 +5930,30 @@ class SkylightCalendarCard extends HTMLElement {
              d.getFullYear() === today.getFullYear();
     };
 
+    const shouldShowWeekNumbers = this.shouldShowMonthWeekNumbers();
     let html = '';
+    let dayIndex = 0;
     const startDay = (firstDay - this._config.firstDayOfWeek + 7) % 7;
 
     // Previous month days
     for (let i = startDay - 1; i >= 0; i--) {
       const day = daysInPrevMonth - i;
       const date = new Date(year, month - 1, day);
+      if (shouldShowWeekNumbers && dayIndex % 7 === 0) {
+        html += this.renderMonthWeekNumberCell(date);
+      }
       html += this.renderDay(day, date, true);
+      dayIndex++;
     }
 
     // Current month days
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
+      if (shouldShowWeekNumbers && dayIndex % 7 === 0) {
+        html += this.renderMonthWeekNumberCell(date);
+      }
       html += this.renderDay(day, date, false);
+      dayIndex++;
     }
 
     // Next month days
@@ -5904,7 +5961,11 @@ class SkylightCalendarCard extends HTMLElement {
     const remainingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
     for (let day = 1; day <= remainingCells; day++) {
       const date = new Date(year, month + 1, day);
+      if (shouldShowWeekNumbers && dayIndex % 7 === 0) {
+        html += this.renderMonthWeekNumberCell(date);
+      }
       html += this.renderDay(day, date, true);
+      dayIndex++;
     }
 
     return html;
@@ -5924,12 +5985,16 @@ class SkylightCalendarCard extends HTMLElement {
     const totalWeeks = this._config.rolling_weeks + 1;
     const totalDays = totalWeeks * 7;
 
+    const shouldShowWeekNumbers = this.shouldShowMonthWeekNumbers();
     let html = '';
 
     // Render all days in the rolling weeks
     for (let i = 0; i < totalDays; i++) {
       const date = new Date(weekStart);
       date.setDate(weekStart.getDate() + i);
+      if (shouldShowWeekNumbers && i % 7 === 0) {
+        html += this.renderMonthWeekNumberCell(date);
+      }
 
       // In rolling-weeks month view, keep trailing (next-month) days visually active
       // while still dimming any leading days from the previous month.
@@ -5980,6 +6045,34 @@ class SkylightCalendarCard extends HTMLElement {
     }
 
     return Math.max(1, Math.floor(usableEventHeight / eventRowHeight));
+  }
+
+  shouldShowMonthWeekNumbers() {
+    return this._viewMode === 'month' && !!this._config?.show_week_numbers_month;
+  }
+
+  getIsoWeekNumber(date) {
+    const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNumber = utcDate.getUTCDay() || 7;
+    utcDate.setUTCDate(utcDate.getUTCDate() + 4 - dayNumber);
+    const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
+    return Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7);
+  }
+
+  formatMonthWeekNumberLabel(date) {
+    const weekNumber = this.getIsoWeekNumber(date);
+    const weekPrefix = this.t('monthWeekPrefix');
+    const localizedWeekNumber = new Intl.NumberFormat(this.getLocale()).format(weekNumber);
+    return `${weekPrefix}${localizedWeekNumber}`;
+  }
+
+  renderMonthWeekNumberCell(date) {
+    const weekLabel = this.formatMonthWeekNumberLabel(date);
+    return `
+      <div class="month-week-number-cell" aria-label="${this.escapeHtml(weekLabel)}">
+        <span class="month-week-number-text">${this.escapeHtml(weekLabel)}</span>
+      </div>
+    `;
   }
 
   renderDay(dayNum, date, isOtherMonth) {
@@ -9800,6 +9893,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
       <div class="boolean-list">
         <label><input type="checkbox" data-field="compact_height" ${this._config.compact_height ? 'checked' : ''}> Compact height</label>
         <label><input type="checkbox" data-field="compact_width" ${this._config.compact_width ? 'checked' : ''}> Schedule view: compact width columns</label>
+        <label><input type="checkbox" data-field="show_week_numbers_month" ${this._config.show_week_numbers_month ? 'checked' : ''}> Month view: show ISO week numbers</label>
         <label><input type="checkbox" data-field="show_all_events_month" ${this._config.show_all_events_month ? 'checked' : ''}> Month view: show all events (override compact height)</label>
         <label><input type="checkbox" data-field="show_all_details_month" ${this._config.show_all_details_month ? 'checked' : ''}> Month view: show all details (week-compact style + override compact height)</label>
         <label><input type="checkbox" data-field="compact_header" ${this._config.compact_header ? 'checked' : ''}> Compact header</label>
