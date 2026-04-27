@@ -966,6 +966,7 @@ class SkylightCalendarCard extends HTMLElement {
       show_all_details_month: config.show_all_details_month || false, // In month view, render all events with week-compact styling (also implies show_all_events_month behavior)
       hide_the_past: config.hide_the_past || false, // Hide events that ended before the current time
       hide_empty_days: config.hide_empty_days || false, // Agenda view: hide day rows that do not contain any visible events
+      agenda_compact_events: config.agenda_compact_events ?? false, // Agenda view: render title + time on one row with compact spacing
       disable_swipe_controls: config.disable_swipe_controls ?? false, // Disable left/right swipe period navigation
       week_start_hour: normalizedWeekStartHour, // Start hour for week-standard view
       week_end_hour: normalizedWeekEndHour, // End hour for week-standard view
@@ -1036,6 +1037,7 @@ class SkylightCalendarCard extends HTMLElement {
       header_weather_sensor: typeof config.header_weather_sensor === 'string' && config.header_weather_sensor.trim()
         ? config.header_weather_sensor.trim()
         : null,
+      agenda_compact_events: config.agenda_compact_events ?? false,
       event_styles: normalizedEventStyles,
       day_styles: normalizedDayStyles
     };
@@ -3423,6 +3425,53 @@ class SkylightCalendarCard extends HTMLElement {
         margin-top: 0;
       }
 
+      .calendar-container.agenda-compact-events .agenda-event {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0 8px;
+        height: auto;
+        padding: 8px 64px 8px calc(12px + var(--combine-left-offset, 0px));
+        padding-bottom: calc(8px + (var(--combined-corner-bubbles, 0) * 16px));
+      }
+
+      .calendar-container.agenda-compact-events .agenda-event-title {
+        flex: 1 1 auto;
+        min-height: unset;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .calendar-container.agenda-compact-events .agenda-event-time {
+        flex: 0 0 auto;
+        min-height: unset;
+        margin-bottom: 0;
+        opacity: 0.9;
+        white-space: nowrap;
+      }
+
+      .calendar-container.agenda-compact-events .agenda-event-location {
+        flex: 0 0 100%;
+        min-height: unset;
+      }
+
+      .calendar-container.agenda-compact-events .agenda-day-date {
+        font-size: 16px;
+      }
+
+      .calendar-container.agenda-compact-events .agenda-day-label {
+        margin-bottom: 2px;
+        padding-bottom: 2px;
+      }
+
+      .calendar-container.agenda-compact-events .agenda-month-banner {
+        font-size: 18px;
+        min-height: 36px;
+        padding: 8px 0;
+      }
+
       .agenda-empty-day {
         color: #9ca3af;
         font-size: 12px;
@@ -4882,7 +4931,7 @@ class SkylightCalendarCard extends HTMLElement {
         </style>
       ` : ''}
 
-      <div class="calendar-container ${this._isDarkMode ? 'dark-mode' : ''} ${hasCustomBackground ? 'custom-background' : ''} ${this._config.hide_year ? 'hide-year' : ''}" style="${containerStyle}">
+      <div class="calendar-container ${this._isDarkMode ? 'dark-mode' : ''} ${hasCustomBackground ? 'custom-background' : ''} ${this._config.hide_year ? 'hide-year' : ''} ${this._config.agenda_compact_events ? 'agenda-compact-events' : ''}" style="${containerStyle}">
         ${this._config.compact_header ? this.renderCompactHeader() : this.renderStandardHeader()}
         <div class="calendar-body">
           ${this.renderCalendarView()}
@@ -5339,8 +5388,8 @@ class SkylightCalendarCard extends HTMLElement {
 
               return `
                 <div class="agenda-event" style="${eventStyle} --agenda-event-min-height: ${eventAgendaMinHeight}; --event-bubble-font-size: ${this.getEventBubbleFontSize(event)}; --event-time-font-size: ${this.getEventTimeFontSize(event)}; --event-location-font-size: ${this.getEventLocationFontSize(event)}; --event-bubble-text-color: ${this.getEventBubbleFontColor(event)};" data-event='${JSON.stringify(event).replace(/'/g, "&#39;")}'>
-                  ${this.shouldShowEventTime(event) ? `<div class="agenda-event-time">${timeLabel}</div>` : ''}
                   <div class="agenda-event-title">${this.renderEventTitleWithPrefix(event, event.summary || this.t('untitledEvent'))}</div>
+                  ${this.shouldShowEventTime(event) ? `<div class="agenda-event-time">${timeLabel}</div>` : ''}
                   ${this.shouldShowEventLocation(event) ? `<div class="agenda-event-location">📍 ${this.escapeHtml(this.getDisplayLocation(event.location, event))}</div>` : ''}
                   ${this.renderEventIcon(event)}
                   ${this.renderCombinedCornerBubbles(event)}
@@ -9461,6 +9510,7 @@ class SkylightCalendarCard extends HTMLElement {
       show_all_events_month: false,
       show_all_details_month: false,
       hide_empty_days: false,
+      agenda_compact_events: false,
       compact_width: false,
       show_current_time_bar: false,
       show_event_location: false,
@@ -10068,6 +10118,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
         <label><input type="checkbox" data-field="lock_schedule_hours" ${this._config.lock_schedule_hours ? 'checked' : ''}> Schedule view: lock week start/end hours</label>
         <label><input type="checkbox" data-field="hide_the_past" ${this._config.hide_the_past ? 'checked' : ''}> Hide events in the past</label>
         <label><input type="checkbox" data-field="hide_empty_days" ${this._config.hide_empty_days ? 'checked' : ''}> Agenda view: hide empty days</label>
+        <label><input type="checkbox" data-field="agenda_compact_events" ${this._config.agenda_compact_events ? 'checked' : ''}> Agenda view: compact events</label>
         <label><input type="checkbox" data-field="disable_swipe_controls" ${this._config.disable_swipe_controls ? 'checked' : ''}> Disable swipe period controls</label>
       </div>
       <div class="field-row">
