@@ -965,6 +965,7 @@ class SkylightCalendarCard extends HTMLElement {
       show_all_events_month: config.show_all_events_month || false, // In month view, show all events and allow week rows to grow while keeping row minimum height
       show_all_details_month: config.show_all_details_month || false, // In month view, render all events with week-compact styling (also implies show_all_events_month behavior)
       hide_the_past: config.hide_the_past || false, // Hide events that ended before the current time
+      hide_empty_days: config.hide_empty_days || false, // Agenda view: hide day rows that do not contain any visible events
       disable_swipe_controls: config.disable_swipe_controls ?? false, // Disable left/right swipe period navigation
       week_start_hour: normalizedWeekStartHour, // Start hour for week-standard view
       week_end_hour: normalizedWeekEndHour, // End hour for week-standard view
@@ -2349,11 +2350,33 @@ class SkylightCalendarCard extends HTMLElement {
 
   updateAgendaVisibleDateRangeFromDom() {
     const visibleRange = this.getAgendaVisibleDateRangeFromDom();
-    if (!visibleRange) return;
+    if (!visibleRange) {
+      this._agendaVisibleStartDate = null;
+      this._agendaVisibleEndDate = null;
+      this.updateAgendaPeriodLabelInDom();
+      return;
+    }
 
     this._agendaVisibleStartDate = visibleRange.startDate;
     this._agendaVisibleEndDate = visibleRange.endDate;
     this.updateAgendaPeriodLabelInDom();
+  }
+
+  isAgendaRangeWithinCurrentWindow(range) {
+    if (!range?.startDate || !range?.endDate || !this._agendaStartDate || !this._agendaEndDate) {
+      return false;
+    }
+
+    const rangeStart = new Date(range.startDate);
+    rangeStart.setHours(0, 0, 0, 0);
+    const rangeEnd = new Date(range.endDate);
+    rangeEnd.setHours(23, 59, 59, 999);
+    const windowStart = new Date(this._agendaStartDate);
+    windowStart.setHours(0, 0, 0, 0);
+    const windowEnd = new Date(this._agendaEndDate);
+    windowEnd.setHours(23, 59, 59, 999);
+
+    return rangeStart >= windowStart && rangeEnd <= windowEnd;
   }
 
   updateAgendaPeriodLabelInDom() {
@@ -5274,10 +5297,18 @@ class SkylightCalendarCard extends HTMLElement {
     const dayNames = this.getWeekdayNames('short');
     const monthFormatter = new Intl.DateTimeFormat(this.getLocale(), { month: 'long', year: 'numeric' });
     const agendaRows = [];
+    const shouldHideEmptyDays = this._viewMode === 'agenda' && !!this._config.hide_empty_days;
+    const agendaDayEntries = agendaDays
+      .map((date) => ({
+        date,
+        events: this.sortEventsForDate(this.getEventsForDay(date), date)
+      }))
+      .filter((entry) => !shouldHideEmptyDays || entry.events.length > 0);
 
-    agendaDays.forEach((date, index) => {
+    agendaDayEntries.forEach((entry, index) => {
+      const { date, events } = entry;
       if (index > 0) {
-        const previousDate = agendaDays[index - 1];
+        const previousDate = agendaDayEntries[index - 1].date;
         const monthChanged = previousDate.getMonth() !== date.getMonth() || previousDate.getFullYear() !== date.getFullYear();
         if (monthChanged) {
           agendaRows.push(`<div class="agenda-month-banner">${this.escapeHtml(monthFormatter.format(date))}</div>`);
@@ -5285,7 +5316,6 @@ class SkylightCalendarCard extends HTMLElement {
       }
 
       const isToday = date.toDateString() === today.toDateString();
-      const events = this.sortEventsForDate(this.getEventsForDay(date), date);
       const dayStyle = this.getDayStyleAttributes(date, events, isToday);
       const dayStyleAttr = dayStyle.style ? ` style="${dayStyle.style}"` : '';
       agendaRows.push(`
@@ -7058,12 +7088,14 @@ class SkylightCalendarCard extends HTMLElement {
       this.ensureAgendaWindowInitialized();
       const dayMs = 24 * 60 * 60 * 1000;
       const windowSpanDays = Math.max(0, Math.round((this._agendaEndDate.getTime() - this._agendaStartDate.getTime()) / dayMs));
-      const visibleRange = this.getAgendaVisibleDateRangeFromDom() || (
-        this._agendaVisibleStartDate && this._agendaVisibleEndDate
-          ? { startDate: this._agendaVisibleStartDate, endDate: this._agendaVisibleEndDate }
-          : null
+      const visibleRangeFromDom = this.getAgendaVisibleDateRangeFromDom();
+      const visibleRangeFromCache = this._agendaVisibleStartDate && this._agendaVisibleEndDate
+        ? { startDate: this._agendaVisibleStartDate, endDate: this._agendaVisibleEndDate }
+        : null;
+      const visibleRange = visibleRangeFromDom || (
+        this.isAgendaRangeWithinCurrentWindow(visibleRangeFromCache) ? visibleRangeFromCache : null
       );
-      const targetStart = visibleRange ? new Date(visibleRange.endDate) : new Date(this._agendaStartDate);
+      const targetStart = visibleRange ? new Date(visibleRange.endDate) : new Date(this._agendaEndDate);
       targetStart.setHours(0, 0, 0, 0);
 
       const targetEnd = new Date(targetStart);
@@ -9428,6 +9460,7 @@ class SkylightCalendarCard extends HTMLElement {
       disable_swipe_controls: false,
       show_all_events_month: false,
       show_all_details_month: false,
+      hide_empty_days: false,
       compact_width: false,
       show_current_time_bar: false,
       show_event_location: false,
@@ -10034,6 +10067,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
       <div class="boolean-list">
         <label><input type="checkbox" data-field="lock_schedule_hours" ${this._config.lock_schedule_hours ? 'checked' : ''}> Schedule view: lock week start/end hours</label>
         <label><input type="checkbox" data-field="hide_the_past" ${this._config.hide_the_past ? 'checked' : ''}> Hide events in the past</label>
+        <label><input type="checkbox" data-field="hide_empty_days" ${this._config.hide_empty_days ? 'checked' : ''}> Agenda view: hide empty days</label>
         <label><input type="checkbox" data-field="disable_swipe_controls" ${this._config.disable_swipe_controls ? 'checked' : ''}> Disable swipe period controls</label>
       </div>
       <div class="field-row">
