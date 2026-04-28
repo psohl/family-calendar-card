@@ -1327,10 +1327,18 @@ class SkylightCalendarCard extends HTMLElement {
       .map((rule) => {
         if (!rule || typeof rule !== 'object') return null;
 
-        const condition = String(rule.condition || '').trim().toLowerCase();
+        const rawCondition = String(rule.condition || '').trim().toLowerCase();
+        if (!rawCondition) return null;
+
+        const isNegatedCondition = rawCondition.startsWith('!');
+        const condition = isNegatedCondition ? rawCondition.slice(1) : rawCondition;
         if (!condition) return null;
 
         if (!['today', 'past', 'future', 'weekend', 'weekday', 'has_event'].includes(condition)) {
+          return null;
+        }
+
+        if (isNegatedCondition && condition !== 'has_event') {
           return null;
         }
 
@@ -1339,6 +1347,7 @@ class SkylightCalendarCard extends HTMLElement {
         }
 
         const normalized = { condition };
+        if (isNegatedCondition) normalized.negate = true;
 
         const normalizedBackground = String(rule.background || '').trim().toLowerCase() === 'auto'
           ? 'auto'
@@ -1627,6 +1636,10 @@ class SkylightCalendarCard extends HTMLElement {
       if (rule.condition === 'has_event') {
         matchedEvent = this.findMatchingDayStyleEvent(rule, dayEvents);
         matches = !!matchedEvent;
+        if (rule.negate) {
+          matches = !matches;
+          if (!matches) matchedEvent = null;
+        }
       }
 
       if (!matches) return;
