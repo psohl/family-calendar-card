@@ -1001,9 +1001,6 @@ class SkylightCalendarCard extends HTMLElement {
       day_styles: normalizedDayStyles, // Per-day styling rules
       hide_times_for_calendars: config.hide_times_for_calendars || [], // Hide times in schedule view for specific calendars
       show_current_time_bar: config.show_current_time_bar || false, // Show a "now" indicator in schedule view
-      use_24hr_schedule: Object.prototype.hasOwnProperty.call(config, 'use_24hr_schedule')
-        ? config.use_24hr_schedule
-        : undefined, // If set, force 12/24-hour notation; otherwise defer to locale defaults
       header_color: normalizedHeaderColor !== undefined ? normalizedHeaderColor : 'var(--primary-color)', // Custom header background color/gradient
       header_text_color: normalizedHeaderTextColor, // Optional custom header text color (auto contrast by default)
       header_background_transparent: normalizedHeaderBackgroundOpacity >= 100, // Legacy alias for full header transparency
@@ -1043,6 +1040,9 @@ class SkylightCalendarCard extends HTMLElement {
       event_styles: normalizedEventStyles,
       day_styles: normalizedDayStyles
     };
+    if (!Object.prototype.hasOwnProperty.call(config, 'use_24hr_schedule')) {
+      delete this._config.use_24hr_schedule; // Preserve locale-based hour cycle defaults when unset
+    }
     this._viewMode = this._config.default_view;
     this.applyThemeMode(this._config.color_scheme);
     this._hiddenCalendars = new Set(
