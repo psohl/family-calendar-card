@@ -1017,6 +1017,7 @@ class SkylightCalendarCard extends HTMLElement {
       combine_calendars_width: config.combine_calendars_width ?? 18, // Stripe width in pixels for combined calendar zebra styling
       enable_event_management: config.enable_event_management !== false, // Enable create/edit/delete
       readonly_calendars: config.readonly_calendars || [], // Calendars that should not allow modifications
+      hide_badge_calendars: config.hide_badge_calendars || [], // Calendars whose badges should be hidden from the header
       language: config.language || null, // Language code for translations (e.g., 'en', 'de', 'fr')
       locale: config.locale || null, // Locale override for date/time formatting (e.g., 'en-US')
       color_scheme: this.normalizeDefaultDarkMode(config.color_scheme), // Controls theme mode on initial load: auto, light, or dark
@@ -5042,12 +5043,17 @@ class SkylightCalendarCard extends HTMLElement {
   renderCalendarBadgesInline() {
     if (!this._config.entities || this._config.entities.length === 0) return '';
     const hideCalendarNames = !!this._config.hide_calendar_names;
+    const hiddenBadgeCalendars = new Set(this._config.hide_badge_calendars || []);
+    const visibleBadgeEntities = this._config.entities
+      .map((entityId, originalIndex) => ({ entityId, originalIndex }))
+      .filter(({ entityId }) => !hiddenBadgeCalendars.has(entityId));
+    if (visibleBadgeEntities.length === 0) return '';
 
     return `
       <div class="calendar-badges-inline">
-        ${this._config.entities.map((entityId, index) => {
+        ${visibleBadgeEntities.map(({ entityId, originalIndex }) => {
           const name = this.getCalendarName(entityId);
-          const color = this.normalizeSingleColor(this._config.colors[entityId] || this.getDefaultColor(index));
+          const color = this.normalizeSingleColor(this._config.colors[entityId] || this.getDefaultColor(originalIndex));
           const isHidden = this._hiddenCalendars.has(entityId);
 
           const badgeBackground = isHidden ? '#f3f4f6' : this.lightenColor(color, 0.85);
@@ -5585,13 +5591,18 @@ class SkylightCalendarCard extends HTMLElement {
   renderCalendarBadges() {
     if (!this._config.entities || this._config.entities.length === 0) return '';
     const hideCalendarNames = !!this._config.hide_calendar_names;
+    const hiddenBadgeCalendars = new Set(this._config.hide_badge_calendars || []);
+    const visibleBadgeEntities = this._config.entities
+      .map((entityId, originalIndex) => ({ entityId, originalIndex }))
+      .filter(({ entityId }) => !hiddenBadgeCalendars.has(entityId));
+    if (visibleBadgeEntities.length === 0) return '';
 
     return `
       <div class="calendar-badges-container">
         <div class="calendar-badges">
-          ${this._config.entities.map((entityId, index) => {
+          ${visibleBadgeEntities.map(({ entityId, originalIndex }) => {
             const name = this.getCalendarName(entityId);
-            const color = this.normalizeSingleColor(this._config.colors[entityId] || this.getDefaultColor(index));
+            const color = this.normalizeSingleColor(this._config.colors[entityId] || this.getDefaultColor(originalIndex));
             const isHidden = this._hiddenCalendars.has(entityId);
 
             const badgeBackground = isHidden ? '#f3f4f6' : this.lightenColor(color, 0.85);
@@ -10359,6 +10370,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
         <label><input type="checkbox" data-field="enable_event_management" ${this._config.enable_event_management !== false ? 'checked' : ''}> Enable event management</label>
       </div>
       ${this.renderSubSection('Read-only calendars', `<div class="list-checkbox-grid">${this.renderCalendarListCheckboxes('readonly_calendars', { label: 'read-only calendars' })}</div>`)}
+      ${this.renderSubSection('Hide header badges for calendars', `<div class="list-checkbox-grid">${this.renderCalendarListCheckboxes('hide_badge_calendars', { label: 'hidden header badges calendars' })}</div>`)}
     `);
 
     const localeSection = this.renderSection('Localization & preferences', `
