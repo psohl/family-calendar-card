@@ -5044,14 +5044,16 @@ class SkylightCalendarCard extends HTMLElement {
     if (!this._config.entities || this._config.entities.length === 0) return '';
     const hideCalendarNames = !!this._config.hide_calendar_names;
     const hiddenBadgeCalendars = new Set(this._config.hide_badge_calendars || []);
-    const visibleBadgeEntities = this._config.entities.filter((entityId) => !hiddenBadgeCalendars.has(entityId));
+    const visibleBadgeEntities = this._config.entities
+      .map((entityId, originalIndex) => ({ entityId, originalIndex }))
+      .filter(({ entityId }) => !hiddenBadgeCalendars.has(entityId));
     if (visibleBadgeEntities.length === 0) return '';
 
     return `
       <div class="calendar-badges-inline">
-        ${visibleBadgeEntities.map((entityId, index) => {
+        ${visibleBadgeEntities.map(({ entityId, originalIndex }) => {
           const name = this.getCalendarName(entityId);
-          const color = this.normalizeSingleColor(this._config.colors[entityId] || this.getDefaultColor(index));
+          const color = this.normalizeSingleColor(this._config.colors[entityId] || this.getDefaultColor(originalIndex));
           const isHidden = this._hiddenCalendars.has(entityId);
 
           const badgeBackground = isHidden ? '#f3f4f6' : this.lightenColor(color, 0.85);
@@ -5590,15 +5592,17 @@ class SkylightCalendarCard extends HTMLElement {
     if (!this._config.entities || this._config.entities.length === 0) return '';
     const hideCalendarNames = !!this._config.hide_calendar_names;
     const hiddenBadgeCalendars = new Set(this._config.hide_badge_calendars || []);
-    const visibleBadgeEntities = this._config.entities.filter((entityId) => !hiddenBadgeCalendars.has(entityId));
+    const visibleBadgeEntities = this._config.entities
+      .map((entityId, originalIndex) => ({ entityId, originalIndex }))
+      .filter(({ entityId }) => !hiddenBadgeCalendars.has(entityId));
     if (visibleBadgeEntities.length === 0) return '';
 
     return `
       <div class="calendar-badges-container">
         <div class="calendar-badges">
-          ${visibleBadgeEntities.map((entityId, index) => {
+          ${visibleBadgeEntities.map(({ entityId, originalIndex }) => {
             const name = this.getCalendarName(entityId);
-            const color = this.normalizeSingleColor(this._config.colors[entityId] || this.getDefaultColor(index));
+            const color = this.normalizeSingleColor(this._config.colors[entityId] || this.getDefaultColor(originalIndex));
             const isHidden = this._hiddenCalendars.has(entityId);
 
             const badgeBackground = isHidden ? '#f3f4f6' : this.lightenColor(color, 0.85);
