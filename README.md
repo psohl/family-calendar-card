@@ -102,6 +102,9 @@ entities:
 
 ---
 
+
+
+
 ## 📚 Documentation
 
 Full documentation is available in the wiki:

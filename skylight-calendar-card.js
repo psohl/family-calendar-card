@@ -1018,6 +1018,7 @@ class SkylightCalendarCard extends HTMLElement {
       enable_event_management: config.enable_event_management !== false, // Enable create/edit/delete
       readonly_calendars: config.readonly_calendars || [], // Calendars that should not allow modifications
       hide_badge_calendars: config.hide_badge_calendars || [], // Calendars whose badges should be hidden from the header
+      virtual_calendars: this.normalizeVirtualCalendars(config.virtual_calendars || []), // Virtual badges mapping to one or more real calendars
       language: config.language || null, // Language code for translations (e.g., 'en', 'de', 'fr')
       locale: config.locale || null, // Locale override for date/time formatting (e.g., 'en-US')
       color_scheme: this.normalizeDefaultDarkMode(config.color_scheme), // Controls theme mode on initial load: auto, light, or dark
@@ -1480,6 +1481,32 @@ class SkylightCalendarCard extends HTMLElement {
     return true;
   }
 
+
+  getEventCalendarMatchTokens(event) {
+    const tokens = [];
+    const entityIds = new Set();
+
+    if (event?.entityId) entityIds.add(event.entityId);
+    if (Array.isArray(event?.sourceEntityIds)) {
+      event.sourceEntityIds.forEach((entityId) => entityId && entityIds.add(entityId));
+    } else if (Array.isArray(event?.sourceCalendars)) {
+      event.sourceCalendars.forEach((calendar) => calendar?.entityId && entityIds.add(calendar.entityId));
+    }
+
+    entityIds.forEach((entityId) => {
+      tokens.push(entityId);
+      tokens.push(this.getCalendarName(entityId));
+      const virtualCalendar = this.getVirtualBadgeForEntity(entityId);
+      if (virtualCalendar) {
+        tokens.push(`virtual:${virtualCalendar.id}`);
+        tokens.push(virtualCalendar.id);
+        tokens.push(virtualCalendar.name);
+      }
+    });
+
+    return Array.from(new Set(tokens.filter(Boolean)));
+  }
+
   eventFieldMatches(event, field, condition) {
     const fieldName = String(field || '').trim().toLowerCase();
     if (!fieldName) return false;
@@ -1490,8 +1517,7 @@ class SkylightCalendarCard extends HTMLElement {
     }
 
     if (fieldName === 'calendar') {
-      const calendarName = this.getCalendarName(event.entityId);
-      return this.matchTextCondition(event.entityId, condition) || this.matchTextCondition(calendarName, condition);
+      return this.getEventCalendarMatchTokens(event).some((token) => this.matchTextCondition(token, condition));
     }
 
     const valueByField = {
@@ -1589,19 +1615,8 @@ class SkylightCalendarCard extends HTMLElement {
     if (!rule || rule.condition !== 'has_event' || !rule.calendar) return null;
 
     return dayEvents.find((event) => {
-      const calendarEntityIds = [event.entityId];
-
-      if (Array.isArray(event.sourceEntityIds)) {
-        calendarEntityIds.push(...event.sourceEntityIds);
-      } else if (Array.isArray(event.sourceCalendars)) {
-        calendarEntityIds.push(...event.sourceCalendars.map((calendar) => calendar.entityId));
-      }
-
-      const uniqueEntityIds = [...new Set(calendarEntityIds.filter((entityId) => !!entityId))];
-      const matchesCalendar = uniqueEntityIds.some((entityId) => {
-        const calendarName = this.getCalendarName(entityId);
-        return this.matchTextCondition(entityId, rule.calendar) || this.matchTextCondition(calendarName, rule.calendar);
-      });
+      const matchesCalendar = this.getEventCalendarMatchTokens(event)
+        .some((token) => this.matchTextCondition(token, rule.calendar));
       if (!matchesCalendar) return false;
 
       if (rule.title_match !== undefined) {
@@ -1713,6 +1728,102 @@ class SkylightCalendarCard extends HTMLElement {
       className: classNames.join(' '),
       style: styles.join('; ')
     };
+  }
+
+
+  normalizeVirtualCalendars(virtualCalendars) {
+    if (!Array.isArray(virtualCalendars)) return [];
+
+    return virtualCalendars
+      .map((entry, index) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const id = typeof entry.id === 'string' && entry.id.trim()
+          ? entry.id.trim()
+          : `virtual_${index + 1}`;
+        const entities = Array.isArray(entry.entities)
+          ? Array.from(new Set(entry.entities
+            .map((entityId) => typeof entityId === 'string' ? entityId.trim() : '')
+            .filter(Boolean)))
+          : [];
+        if (entities.length === 0) return null;
+        return {
+          id,
+          name: typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim() : id,
+          icon: typeof entry.icon === 'string' && entry.icon.trim() ? entry.icon.trim() : null,
+          color: this.normalizeSingleColor(entry.color),
+          entities
+        };
+      })
+      .filter(Boolean);
+  }
+
+  getVirtualBadgeById(virtualId) {
+    return (this._config.virtual_calendars || []).find((virtualCalendar) => virtualCalendar.id === virtualId) || null;
+  }
+
+  getVirtualBadgeForEntity(entityId) {
+    return (this._config.virtual_calendars || []).find((virtualCalendar) => virtualCalendar.entities.includes(entityId)) || null;
+  }
+
+  getVirtualBadgeForEvent(event) {
+    if (!event) return null;
+
+    if (event.isCombinedCalendarEvent && Array.isArray(event.sourceEntityIds) && event.sourceEntityIds.length > 0) {
+      const virtualCalendars = event.sourceEntityIds
+        .map((entityId) => this.getVirtualBadgeForEntity(entityId))
+        .filter(Boolean);
+      if (virtualCalendars.length > 0) {
+        return virtualCalendars[0];
+      }
+      return null;
+    }
+
+    return this.getVirtualBadgeForEntity(event.entityId);
+  }
+
+  getVirtualBadgeItems() {
+    const hiddenBadgeCalendars = new Set(this._config.hide_badge_calendars || []);
+    const items = [];
+    const insertedVirtualIds = new Set();
+
+    this._config.entities.forEach((entityId, originalIndex) => {
+      const virtualCalendar = this.getVirtualBadgeForEntity(entityId);
+      if (virtualCalendar && !insertedVirtualIds.has(virtualCalendar.id)) {
+        const configuredEntities = virtualCalendar.entities.filter((configuredEntityId) => this._config.entities.includes(configuredEntityId));
+        const hasVisibleEntity = configuredEntities.some((configuredEntityId) => !hiddenBadgeCalendars.has(configuredEntityId));
+        if (hasVisibleEntity) {
+          const color = virtualCalendar.color || this.normalizeSingleColor(this._config.colors[entityId] || this.getDefaultColor(originalIndex));
+          const isHidden = configuredEntities.every((configuredEntityId) => this._hiddenCalendars.has(configuredEntityId));
+          items.push({
+            id: virtualCalendar.id,
+            entityId: `virtual:${virtualCalendar.id}`,
+            name: virtualCalendar.name,
+            icon: virtualCalendar.icon,
+            color,
+            entities: configuredEntities,
+            isHidden,
+            type: 'virtual'
+          });
+        }
+        insertedVirtualIds.add(virtualCalendar.id);
+        return;
+      }
+
+      if (virtualCalendar || hiddenBadgeCalendars.has(entityId)) return;
+      const color = this.normalizeSingleColor(this._config.colors[entityId] || this.getDefaultColor(originalIndex));
+      items.push({
+        id: entityId,
+        entityId,
+        name: this.getCalendarName(entityId),
+        icon: this.getCalendarBadgeIcon(entityId),
+        color,
+        entities: [entityId],
+        isHidden: this._hiddenCalendars.has(entityId),
+        type: 'entity'
+      });
+    });
+
+    return items;
   }
 
   getWritableCalendars() {
@@ -5041,31 +5152,23 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   renderCalendarBadgesInline() {
-    if (!this._config.entities || this._config.entities.length === 0) return '';
+    const badgeItems = this.getVirtualBadgeItems();
+    if (badgeItems.length === 0) return '';
     const hideCalendarNames = !!this._config.hide_calendar_names;
-    const hiddenBadgeCalendars = new Set(this._config.hide_badge_calendars || []);
-    const visibleBadgeEntities = this._config.entities
-      .map((entityId, originalIndex) => ({ entityId, originalIndex }))
-      .filter(({ entityId }) => !hiddenBadgeCalendars.has(entityId));
-    if (visibleBadgeEntities.length === 0) return '';
 
     return `
       <div class="calendar-badges-inline">
-        ${visibleBadgeEntities.map(({ entityId, originalIndex }) => {
-          const name = this.getCalendarName(entityId);
-          const color = this.normalizeSingleColor(this._config.colors[entityId] || this.getDefaultColor(originalIndex));
-          const isHidden = this._hiddenCalendars.has(entityId);
-
-          const badgeBackground = isHidden ? '#f3f4f6' : this.lightenColor(color, 0.85);
-          const badgeTextColor = isHidden ? '#9ca3af' : this.getContractColor(badgeBackground);
+        ${badgeItems.map((badgeItem) => {
+          const badgeBackground = badgeItem.isHidden ? '#f3f4f6' : this.lightenColor(badgeItem.color, 0.85);
+          const badgeTextColor = badgeItem.isHidden ? '#9ca3af' : this.getContractColor(badgeBackground);
 
           return `
-            <div class="calendar-badge calendar-badge-inline ${isHidden ? 'calendar-badge-hidden' : ''} ${hideCalendarNames ? 'hide-calendar-name' : ''}"
-                 data-entity="${entityId}"
+            <div class="calendar-badge calendar-badge-inline ${badgeItem.isHidden ? 'calendar-badge-hidden' : ''} ${hideCalendarNames ? 'hide-calendar-name' : ''}"
+                 data-entity="${badgeItem.entityId}"
                  style="background: ${badgeBackground};
-                        border-color: ${isHidden ? '#d1d5db' : color};">
-              ${this.renderCalendarBadgeIcon(entityId, name, color, isHidden)}
-              ${hideCalendarNames ? '' : `<span class="calendar-badge-name" style="color: ${badgeTextColor}">${this.escapeHtml(name)}</span>`}
+                        border-color: ${badgeItem.isHidden ? '#d1d5db' : badgeItem.color};">
+              ${this.renderCalendarBadgeIcon(badgeItem.entityId, badgeItem.name, badgeItem.color, badgeItem.isHidden, badgeItem.icon)}
+              ${hideCalendarNames ? '' : `<span class="calendar-badge-name" style="color: ${badgeTextColor}">${this.escapeHtml(badgeItem.name)}</span>`}
             </div>
           `;
         }).join('')}
@@ -5589,33 +5692,25 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   renderCalendarBadges() {
-    if (!this._config.entities || this._config.entities.length === 0) return '';
+    const badgeItems = this.getVirtualBadgeItems();
+    if (badgeItems.length === 0) return '';
     const hideCalendarNames = !!this._config.hide_calendar_names;
-    const hiddenBadgeCalendars = new Set(this._config.hide_badge_calendars || []);
-    const visibleBadgeEntities = this._config.entities
-      .map((entityId, originalIndex) => ({ entityId, originalIndex }))
-      .filter(({ entityId }) => !hiddenBadgeCalendars.has(entityId));
-    if (visibleBadgeEntities.length === 0) return '';
 
     return `
       <div class="calendar-badges-container">
         <div class="calendar-badges">
-          ${visibleBadgeEntities.map(({ entityId, originalIndex }) => {
-            const name = this.getCalendarName(entityId);
-            const color = this.normalizeSingleColor(this._config.colors[entityId] || this.getDefaultColor(originalIndex));
-            const isHidden = this._hiddenCalendars.has(entityId);
-
-            const badgeBackground = isHidden ? '#f3f4f6' : this.lightenColor(color, 0.85);
-            const badgeTextColor = isHidden ? '#9ca3af' : this.getContractColor(badgeBackground);
+          ${badgeItems.map((badgeItem) => {
+            const badgeBackground = badgeItem.isHidden ? '#f3f4f6' : this.lightenColor(badgeItem.color, 0.85);
+            const badgeTextColor = badgeItem.isHidden ? '#9ca3af' : this.getContractColor(badgeBackground);
 
             return `
-              <div class="calendar-badge ${isHidden ? 'calendar-badge-hidden' : ''} ${hideCalendarNames ? 'hide-calendar-name' : ''}"
-                   data-entity="${entityId}"
+              <div class="calendar-badge ${badgeItem.isHidden ? 'calendar-badge-hidden' : ''} ${hideCalendarNames ? 'hide-calendar-name' : ''}"
+                   data-entity="${badgeItem.entityId}"
                    style="background: ${badgeBackground};
-                          border-color: ${isHidden ? '#d1d5db' : color};
+                          border-color: ${badgeItem.isHidden ? '#d1d5db' : badgeItem.color};
                           cursor: pointer;">
-                ${this.renderCalendarBadgeIcon(entityId, name, color, isHidden)}
-                ${hideCalendarNames ? '' : `<span class="calendar-badge-name" style="color: ${badgeTextColor}">${this.escapeHtml(name)}</span>`}
+                ${this.renderCalendarBadgeIcon(badgeItem.entityId, badgeItem.name, badgeItem.color, badgeItem.isHidden, badgeItem.icon)}
+                ${hideCalendarNames ? '' : `<span class="calendar-badge-name" style="color: ${badgeTextColor}">${this.escapeHtml(badgeItem.name)}</span>`}
               </div>
             `;
           }).join('')}
@@ -5793,6 +5888,14 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   getVisibleCalendarBadgesForEvent(event) {
+    const virtualCalendar = this.getVirtualBadgeForEvent(event);
+    if (virtualCalendar) {
+      const visibleSourceEntityIds = virtualCalendar.entities.filter((entityId) => !this._hiddenCalendars.has(entityId));
+      if (visibleSourceEntityIds.length === 0) return [];
+      const fallbackColor = event?.color || this.normalizeSingleColor(this._config.colors[virtualCalendar.entities[0]]);
+      return [{ entityId: `virtual:${virtualCalendar.id}`, color: virtualCalendar.color || fallbackColor }];
+    }
+
     if (event.isCombinedCalendarEvent && Array.isArray(event.sourceCalendars)) {
       return event.sourceCalendars.filter(calendar => !this._hiddenCalendars.has(calendar.entityId));
     }
@@ -5810,7 +5913,7 @@ class SkylightCalendarCard extends HTMLElement {
     const hideCalendarBubble = styleOverrides?.hide_event_calendar_bubble ?? this._config.hide_event_calendar_bubble;
 
     if (useFriendlyName) {
-      const visibleBadges = this.getVisibleCalendarBadgesForEvent(event);
+      const visibleBadges = this.getModalCalendarBadgesForEvent(event);
       if (visibleBadges.length === 0) {
         return '';
       }
@@ -5826,7 +5929,7 @@ class SkylightCalendarCard extends HTMLElement {
       return '';
     }
 
-    const visibleBadges = this.getVisibleCalendarBadgesForEvent(event);
+    const visibleBadges = this.getModalCalendarBadgesForEvent(event);
     if (visibleBadges.length === 0) {
       return '';
     }
@@ -5840,8 +5943,27 @@ class SkylightCalendarCard extends HTMLElement {
     return `<div class="week-standard-event-icons">${badgesHtml}</div>`;
   }
 
+
+  isCombinedEventWithinSingleVirtualCalendar(event) {
+    if (!event?.isCombinedCalendarEvent || !Array.isArray(event?.sourceEvents)) return false;
+
+    const visibleSources = event.sourceEvents.filter((sourceEvent) => !this._hiddenCalendars.has(sourceEvent.entityId));
+    if (visibleSources.length <= 1) return false;
+
+    const virtualIds = new Set();
+    for (const sourceEvent of visibleSources) {
+      const virtualCalendar = this.getVirtualBadgeForEntity(sourceEvent.entityId);
+      if (!virtualCalendar) return false;
+      virtualIds.add(virtualCalendar.id);
+      if (virtualIds.size > 1) return false;
+    }
+
+    return virtualIds.size === 1;
+  }
+
   shouldShowCombinedCornerBubbles(event) {
     if (!event?.isCombinedCalendarEvent || !this._config.combine_calendars) return false;
+    if (this.isCombinedEventWithinSingleVirtualCalendar(event)) return false;
     const styleOverrides = this.getEventStyleOverrides(event);
     return !!styleOverrides?.hasDuplicateBackgroundColors;
   }
@@ -5849,7 +5971,7 @@ class SkylightCalendarCard extends HTMLElement {
   renderCombinedCornerBubbles(event) {
     if (!this.shouldShowCombinedCornerBubbles(event)) return '';
 
-    const visibleBadges = this.getVisibleCalendarBadgesForEvent(event);
+    const visibleBadges = this.getModalCalendarBadgesForEvent(event);
     if (visibleBadges.length <= 1) return '';
 
     const bubblesHtml = visibleBadges.map((calendar) => {
@@ -5865,7 +5987,7 @@ class SkylightCalendarCard extends HTMLElement {
     const titleText = this.escapeHtml(title || this.t('untitledEvent'));
     const styleOverrides = this.getEventStyleOverrides(event);
     const prefixMode = this.normalizeEventTitlePrefixMode(styleOverrides?.event_title_prefix ?? this._config.event_title_prefix);
-    const visibleBadges = this.getVisibleCalendarBadgesForEvent(event);
+    const visibleBadges = this.getModalCalendarBadgesForEvent(event);
     if (prefixMode === 'none' || visibleBadges.length === 0) {
       return titleText;
     }
@@ -6538,6 +6660,31 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   getVisibleCalendarColorsForEvent(event) {
+    const virtualCalendar = this.getVirtualBadgeForEvent(event);
+    if (virtualCalendar) {
+      const virtualSourceEntityIds = (Array.isArray(event?.sourceEntityIds) ? event.sourceEntityIds : [event?.entityId])
+        .filter((entityId) => virtualCalendar.entities.includes(entityId));
+      const hasVisibleVirtualSource = virtualSourceEntityIds.some((entityId) => !this._hiddenCalendars.has(entityId));
+      if (!hasVisibleVirtualSource) return [];
+
+      const fallbackColor = event?.color || this.normalizeSingleColor(this._config.colors[virtualCalendar.entities[0]]);
+      const virtualColor = virtualCalendar.color || fallbackColor;
+
+      if (event?.isCombinedCalendarEvent && Array.isArray(event.sourceCalendars)) {
+        const additionalColors = Array.from(new Set(event.sourceCalendars
+          .filter((calendar) => calendar?.entityId && !virtualCalendar.entities.includes(calendar.entityId))
+          .filter((calendar) => !this._hiddenCalendars.has(calendar.entityId))
+          .map((calendar) => calendar.color)
+          .filter(Boolean)));
+
+        if (additionalColors.length > 0) {
+          return [virtualColor, ...additionalColors];
+        }
+      }
+
+      return [virtualColor];
+    }
+
     if (event.isCombinedCalendarEvent && Array.isArray(event.sourceEntityIds)) {
       const hasVisibleSourceCalendar = event.sourceEntityIds.some((entityId) => !this._hiddenCalendars.has(entityId));
       if (!hasVisibleSourceCalendar) {
@@ -6601,6 +6748,9 @@ class SkylightCalendarCard extends HTMLElement {
         candidates: this.getSingleEventStyleCandidates(sourceEvent)
       }));
 
+      const explicitBackgroundColors = sourceCandidates
+        .map(({ candidates }) => candidates.background_color?.value)
+        .filter((color) => color !== undefined && color !== null && color !== '');
       const backgroundColors = sourceCandidates.map(({ sourceEvent, candidates }) =>
         candidates.background_color?.value || sourceEvent.color
       );
@@ -6625,7 +6775,12 @@ class SkylightCalendarCard extends HTMLElement {
         if (best) mergedOverrides[styleKey] = best.value;
       });
 
-      return { ...mergedOverrides, backgroundColors, hasDuplicateBackgroundColors };
+      return {
+        ...mergedOverrides,
+        backgroundColors,
+        hasDuplicateBackgroundColors,
+        hasExplicitBackgroundColor: explicitBackgroundColors.length > 0
+      };
     }
 
     const candidates = this.getSingleEventStyleCandidates(event);
@@ -6635,6 +6790,7 @@ class SkylightCalendarCard extends HTMLElement {
     }, {});
     overrides.backgroundColors = [overrides.background_color || event.color];
     overrides.hasDuplicateBackgroundColors = false;
+    overrides.hasExplicitBackgroundColor = Object.prototype.hasOwnProperty.call(overrides, 'background_color');
     return overrides;
   }
 
@@ -6713,7 +6869,19 @@ class SkylightCalendarCard extends HTMLElement {
 
   getEventStyle(event, { withBorderAccent = false } = {}) {
     const styleOverrides = this.getEventStyleOverrides(event);
-    const visibleColors = styleOverrides?.backgroundColors?.length ? styleOverrides.backgroundColors : this.getVisibleCalendarColorsForEvent(event);
+    const virtualCalendar = this.getVirtualBadgeForEvent(event);
+    const virtualColor = virtualCalendar
+      ? (virtualCalendar.color || event?.color || this.normalizeSingleColor(this._config.colors[virtualCalendar.entities[0]]))
+      : null;
+    const resolvedVisibleColors = this.getVisibleCalendarColorsForEvent(event);
+    const virtualExplicitColors = virtualCalendar && styleOverrides?.hasExplicitBackgroundColor
+      ? Array.from(new Set((styleOverrides.backgroundColors || []).filter(Boolean)))
+      : null;
+    const visibleColors = virtualExplicitColors?.length
+      ? virtualExplicitColors
+      : (virtualCalendar
+        ? resolvedVisibleColors
+        : (styleOverrides?.backgroundColors?.length ? styleOverrides.backgroundColors : resolvedVisibleColors));
     const primaryColor = visibleColors[0] || event.color;
 
     const shouldShowBorderAccent = withBorderAccent && visibleColors.length <= 1;
@@ -6923,11 +7091,18 @@ class SkylightCalendarCard extends HTMLElement {
     this._root.querySelectorAll('.calendar-badge, .calendar-badge-inline').forEach(badge => {
       badge.addEventListener('click', (e) => {
         const entityId = badge.getAttribute('data-entity');
-        if (this._hiddenCalendars.has(entityId)) {
-          this._hiddenCalendars.delete(entityId);
-        } else {
-          this._hiddenCalendars.add(entityId);
-        }
+        const virtualBadge = entityId?.startsWith('virtual:')
+          ? this.getVirtualBadgeById(entityId.replace('virtual:', ''))
+          : null;
+        const targetEntities = virtualBadge ? virtualBadge.entities : [entityId];
+        const allHidden = targetEntities.every((targetEntityId) => this._hiddenCalendars.has(targetEntityId));
+        targetEntities.forEach((targetEntityId) => {
+          if (allHidden) {
+            this._hiddenCalendars.delete(targetEntityId);
+          } else {
+            this._hiddenCalendars.add(targetEntityId);
+          }
+        });
         this.persistPreferences();
         this.renderPreservingAgendaScroll();
       });
@@ -8882,6 +9057,20 @@ class SkylightCalendarCard extends HTMLElement {
     this._activeModalBackHandler = typeof onCloseBack === 'function' ? onCloseBack : null;
   }
 
+
+  getModalCalendarBadgesForEvent(event) {
+    if (event?.isCombinedCalendarEvent && Array.isArray(event.sourceCalendars)) {
+      const sourceBadges = event.sourceCalendars
+        .filter((calendar) => calendar?.entityId && !this._hiddenCalendars.has(calendar.entityId))
+        .map((calendar) => ({ entityId: calendar.entityId, color: calendar.color || event.color }));
+      if (sourceBadges.length > 0) {
+        return sourceBadges;
+      }
+    }
+
+    return this.getVisibleCalendarBadgesForEvent(event);
+  }
+
   showEventModal(event, onCloseBack = null) {
     const modal = this.getRootElementById('event-modal');
     const content = this.getRootElementById('modal-content');
@@ -8913,7 +9102,7 @@ class SkylightCalendarCard extends HTMLElement {
     // Get calendar info and capabilities
     const calendarName = this.getCalendarName(event.entityId);
     const capabilities = this._calendarCapabilities[event.entityId] || {};
-    const visibleBadges = this.getVisibleCalendarBadgesForEvent(event);
+    const visibleBadges = this.getModalCalendarBadgesForEvent(event);
     const combinedBadgeHtml = event.isCombinedCalendarEvent
       ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">${visibleBadges.map(calendar => `<span class="modal-calendar-badge" style="background: ${calendar.color}; color: white; display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px;">${this.escapeHtml(this.getCalendarName(calendar.entityId))}</span>`).join('')}</div>`
       : `<div class="modal-calendar-badge" style="background: ${event.color}; color: white; display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; margin-top: 8px;">${this.escapeHtml(calendarName)}</div>`;
@@ -9479,13 +9668,17 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   getCalendarBadgeIcon(entityId) {
+    if (entityId && entityId.startsWith('virtual:')) {
+      const virtualBadge = (this._config.virtual_calendars || []).find((calendar) => `virtual:${calendar.id}` === entityId);
+      if (virtualBadge?.icon) return virtualBadge.icon;
+    }
     const configured = this._config.calendar_badge_icons?.[entityId];
     if (!configured) return null;
     return String(configured).trim() || null;
   }
 
-  renderCalendarBadgeIcon(entityId, name, color, isHidden) {
-    const configuredBadgeIcon = this.getCalendarBadgeIcon(entityId);
+  renderCalendarBadgeIcon(entityId, name, color, isHidden, iconOverride = null) {
+    const configuredBadgeIcon = iconOverride || this.getCalendarBadgeIcon(entityId);
     const iconBackground = isHidden ? '#9ca3af' : this.normalizeSingleColor(color);
 
     if (configuredBadgeIcon && configuredBadgeIcon.startsWith('mdi:')) {
