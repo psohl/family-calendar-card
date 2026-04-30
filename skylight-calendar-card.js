@@ -9657,6 +9657,19 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   getCalendarName(entityId) {
+    if (!entityId) {
+      return '';
+    }
+
+    if (entityId.startsWith('virtual:')) {
+      const virtualId = entityId.replace('virtual:', '');
+      const virtualBadge = this.getVirtualBadgeById(virtualId);
+      if (virtualBadge?.name) {
+        return virtualBadge.name;
+      }
+      return virtualId;
+    }
+
     // Check if there's a custom name mapping
     if (this._config.calendar_names && this._config.calendar_names[entityId]) {
       return this._config.calendar_names[entityId];
@@ -9664,7 +9677,8 @@ class SkylightCalendarCard extends HTMLElement {
 
     // Otherwise use friendly_name from entity or entity ID
     const entity = this._hass?.states[entityId];
-    return entity?.attributes?.friendly_name || entityId.split('.')[1];
+    const fallbackName = entityId.includes('.') ? entityId.split('.').slice(1).join('.') : entityId;
+    return entity?.attributes?.friendly_name || fallbackName;
   }
 
   getCalendarBadgeIcon(entityId) {
