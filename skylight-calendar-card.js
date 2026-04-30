@@ -2158,7 +2158,7 @@ class SkylightCalendarCard extends HTMLElement {
       containerTopInViewport ?? this.getBoundingClientRect().top,
       0
     );
-    const bottomSpacing = 24;
+    const bottomSpacing = 0;
     const minimumHeight = 180;
 
     return Math.max(minimumHeight, Math.floor(viewportHeight - containerTop - bottomSpacing));
@@ -2170,7 +2170,7 @@ class SkylightCalendarCard extends HTMLElement {
     const resolvedMaxHeight = maxHeight || this.getCompactMaxHeight();
     if (!resolvedMaxHeight) return '';
 
-    return `max-height: ${resolvedMaxHeight}px; overflow-y: auto;`;
+    return `height: ${resolvedMaxHeight}px; max-height: ${resolvedMaxHeight}px; overflow-y: auto;`;
   }
 
   preserveAgendaScrollForNextRender() {
