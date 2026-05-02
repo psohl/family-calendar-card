@@ -1,0 +1,7 @@
+{
+  "name": "skylight-calendar-card",
+  "private": true,
+  "scripts": {
+    "test": "node --test skylight-calendar-card.test.js"
+  }
+}
