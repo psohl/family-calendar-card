@@ -22,9 +22,11 @@
           'calendar.work': { entity_id: 'calendar.work', attributes: { friendly_name: 'Work', supported_features: 7 } }
         },
         callApi: async (method, endpoint, payload) => {
-          if (method === 'get' && endpoint.endsWith('/events')) {
-            const id = endpoint.split('/')[2];
-            return events[id] || [];
+          const normalizedMethod = String(method || '').toUpperCase();
+          if (normalizedMethod === 'GET' && endpoint.startsWith('calendars/')) {
+            const calendarPath = endpoint.slice('calendars/'.length);
+            const calendarEntity = calendarPath.split('?')[0];
+            return events[calendarEntity] || [];
           }
           return [];
         },
