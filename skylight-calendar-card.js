@@ -1035,7 +1035,8 @@ class SkylightCalendarCard extends HTMLElement {
     const normalizedCalendarColors = this.normalizeColorMap(config.colors || {});
     const normalizedEventFontColors = this.normalizeColorMap(config.event_font_colors || {});
     const normalizedEventStyles = this.normalizeEventStyles(config.event_styles || []);
-    const normalizedDayStyles = this.normalizeDayStyles(config.day_styles || []);
+    const normalizedLocale = resolveLanguage(config.locale || config.language || this._hass?.locale?.language || this._hass?.language);
+    const normalizedDayStyles = this.normalizeDayStyles(config.day_styles || [], normalizedLocale);
     const normalizedHeaderColor = this.normalizeSingleColor(config.header_color);
     const normalizedHeaderTextColor = this.normalizeSingleColor(config.header_text_color);
     const hasConfiguredHeaderBackgroundOpacity = config.header_background_opacity !== undefined && config.header_background_opacity !== null && config.header_background_opacity !== '';
@@ -1433,7 +1434,7 @@ class SkylightCalendarCard extends HTMLElement {
       .filter(Boolean);
   }
 
-  normalizeDayStyles(rawRules) {
+  normalizeDayStyles(rawRules, localeOverride = null) {
     if (!Array.isArray(rawRules)) return [];
 
     return rawRules
@@ -1462,7 +1463,7 @@ class SkylightCalendarCard extends HTMLElement {
           return null;
         }
         if (condition === 'day_of_week') {
-          const dayOfWeek = this.normalizeDayOfWeekRule(rule.day_of_week ?? rule.day ?? rule.days);
+          const dayOfWeek = this.normalizeDayOfWeekRule(rule.day_of_week ?? rule.day ?? rule.days, localeOverride);
           if (!dayOfWeek.length) return null;
           normalized.day_of_week = dayOfWeek;
         }
@@ -1530,7 +1531,7 @@ class SkylightCalendarCard extends HTMLElement {
     return null;
   }
 
-  normalizeDayOfWeekRule(value) {
+  normalizeDayOfWeekRule(value, localeOverride = null) {
     const dayMap = new Map([
       ['sun', 0], ['sunday', 0], ['0', 0],
       ['mon', 1], ['monday', 1], ['1', 1],
@@ -1540,7 +1541,11 @@ class SkylightCalendarCard extends HTMLElement {
       ['fri', 5], ['friday', 5], ['5', 5],
       ['sat', 6], ['saturday', 6], ['6', 6]
     ]);
-    this.getLocalizedWeekdayMap().forEach((dayIndex, token) => dayMap.set(token, dayIndex));
+    this.getLocalizedWeekdayMap(localeOverride).forEach((dayIndexes, token) => {
+      if (!dayMap.has(token)) {
+        dayMap.set(token, dayIndexes.length === 1 ? dayIndexes[0] : dayIndexes);
+      }
+    });
 
     const values = Array.isArray(value) ? value : [value];
     const normalizedDays = [];
@@ -1555,14 +1560,21 @@ class SkylightCalendarCard extends HTMLElement {
 
       const normalizedEntry = String(entry).trim().toLowerCase();
       if (!normalizedEntry) return;
-      if (dayMap.has(normalizedEntry)) normalizedDays.push(dayMap.get(normalizedEntry));
+      if (dayMap.has(normalizedEntry)) {
+        const mappedValue = dayMap.get(normalizedEntry);
+        if (Array.isArray(mappedValue)) {
+          normalizedDays.push(...mappedValue);
+        } else {
+          normalizedDays.push(mappedValue);
+        }
+      }
     });
 
     return Array.from(new Set(normalizedDays));
   }
 
-  getLocalizedWeekdayMap() {
-    const locale = this.getLocale();
+  getLocalizedWeekdayMap(localeOverride = null) {
+    const locale = resolveLanguage(localeOverride || this.getLocale());
     const cacheKey = locale || 'default';
     if (!this._localizedWeekdayMapCache) this._localizedWeekdayMapCache = new Map();
     if (this._localizedWeekdayMapCache.has(cacheKey)) return this._localizedWeekdayMapCache.get(cacheKey);
@@ -1577,7 +1589,13 @@ class SkylightCalendarCard extends HTMLElement {
         date.setUTCDate(anchorSunday.getUTCDate() + dayIndex);
         const localizedName = new Intl.DateTimeFormat(locale, { weekday: weekdayFormat, timeZone: 'UTC' }).format(date);
         const normalizedName = String(localizedName || '').trim().toLowerCase();
-        if (normalizedName) map.set(normalizedName, dayIndex);
+        if (!normalizedName) continue;
+        if (!map.has(normalizedName)) {
+          map.set(normalizedName, [dayIndex]);
+          continue;
+        }
+        const existingDayIndexes = map.get(normalizedName);
+        if (!existingDayIndexes.includes(dayIndex)) existingDayIndexes.push(dayIndex);
       }
     });
 
