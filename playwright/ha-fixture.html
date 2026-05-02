@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>HA Fixture</title>
+  <style>body{margin:0;padding:16px;background:#fff;font-family:Arial,sans-serif;}</style>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="../skylight-calendar-card.js"></script>
+  <script>
+    window.renderCalendarCard = ({ config, events, darkMode = false }) => {
+      const app = document.getElementById('app');
+      app.innerHTML = '';
+      const el = document.createElement('skylight-calendar-card');
+      const hass = {
+        language: 'en',
+        locale: { language: 'en' },
+        themes: { darkMode },
+        states: {
+          'calendar.family': { entity_id: 'calendar.family', attributes: { friendly_name: 'Family', supported_features: 7 } },
+          'calendar.work': { entity_id: 'calendar.work', attributes: { friendly_name: 'Work', supported_features: 7 } }
+        },
+        callApi: async (method, endpoint, payload) => {
+          if (method === 'get' && endpoint.endsWith('/events')) {
+            const id = endpoint.split('/')[2];
+            return events[id] || [];
+          }
+          return [];
+        },
+        callService: async () => ({})
+      };
+      el.setConfig(config);
+      el.hass = hass;
+      app.appendChild(el);
+    };
+  </script>
+</body>
+</html>
