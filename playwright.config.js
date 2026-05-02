@@ -6,6 +6,9 @@ module.exports = defineConfig({
   expect: { timeout: 10_000 },
   fullyParallel: false,
   workers: 1,
+  
+  snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}{ext}',
+  
   use: {
     viewport: { width: 1400, height: 1000 },
     colorScheme: 'light'
