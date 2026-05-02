@@ -1035,7 +1035,8 @@ class SkylightCalendarCard extends HTMLElement {
     const normalizedCalendarColors = this.normalizeColorMap(config.colors || {});
     const normalizedEventFontColors = this.normalizeColorMap(config.event_font_colors || {});
     const normalizedEventStyles = this.normalizeEventStyles(config.event_styles || []);
-    const normalizedDayStyles = this.normalizeDayStyles(config.day_styles || []);
+    const normalizedLocale = resolveLanguage(config.locale || config.language || this._hass?.locale?.language || this._hass?.language);
+    const normalizedDayStyles = this.normalizeDayStyles(config.day_styles || [], normalizedLocale);
     const normalizedHeaderColor = this.normalizeSingleColor(config.header_color);
     const normalizedHeaderTextColor = this.normalizeSingleColor(config.header_text_color);
     const hasConfiguredHeaderBackgroundOpacity = config.header_background_opacity !== undefined && config.header_background_opacity !== null && config.header_background_opacity !== '';
@@ -1433,7 +1434,7 @@ class SkylightCalendarCard extends HTMLElement {
       .filter(Boolean);
   }
 
-  normalizeDayStyles(rawRules) {
+  normalizeDayStyles(rawRules, localeOverride = null) {
     if (!Array.isArray(rawRules)) return [];
 
     return rawRules
@@ -1447,7 +1448,7 @@ class SkylightCalendarCard extends HTMLElement {
         const condition = isNegatedCondition ? rawCondition.slice(1) : rawCondition;
         if (!condition) return null;
 
-        if (!['today', 'past', 'future', 'weekend', 'weekday', 'has_event'].includes(condition)) {
+        if (!['today', 'past', 'future', 'weekend', 'weekday', 'day_of_week', 'has_event'].includes(condition)) {
           return null;
         }
 
@@ -1455,12 +1456,17 @@ class SkylightCalendarCard extends HTMLElement {
           return null;
         }
 
+        const normalized = { condition };
+        if (isNegatedCondition) normalized.negate = true;
+
         if (condition === 'has_event' && (!rule.calendar || !String(rule.calendar).trim())) {
           return null;
         }
-
-        const normalized = { condition };
-        if (isNegatedCondition) normalized.negate = true;
+        if (condition === 'day_of_week') {
+          const dayOfWeek = this.normalizeDayOfWeekRule(rule.day_of_week ?? rule.day ?? rule.days, localeOverride);
+          if (!dayOfWeek.length) return null;
+          normalized.day_of_week = dayOfWeek;
+        }
 
         const normalizedBackground = String(rule.background || '').trim().toLowerCase() === 'auto'
           ? 'auto'
@@ -1523,6 +1529,78 @@ class SkylightCalendarCard extends HTMLElement {
     }
 
     return null;
+  }
+
+  normalizeDayOfWeekRule(value, localeOverride = null) {
+    const dayMap = new Map([
+      ['sun', 0], ['sunday', 0], ['0', 0],
+      ['mon', 1], ['monday', 1], ['1', 1],
+      ['tue', 2], ['tues', 2], ['tuesday', 2], ['2', 2],
+      ['wed', 3], ['weds', 3], ['wednesday', 3], ['3', 3],
+      ['thu', 4], ['thur', 4], ['thurs', 4], ['thursday', 4], ['4', 4],
+      ['fri', 5], ['friday', 5], ['5', 5],
+      ['sat', 6], ['saturday', 6], ['6', 6]
+    ]);
+    this.getLocalizedWeekdayMap(localeOverride).forEach((dayIndexes, token) => {
+      if (!dayMap.has(token)) {
+        dayMap.set(token, dayIndexes.length === 1 ? dayIndexes[0] : dayIndexes);
+      }
+    });
+
+    const values = Array.isArray(value) ? value : [value];
+    const normalizedDays = [];
+
+    values.forEach((entry) => {
+      if (entry === undefined || entry === null || entry === '') return;
+
+      if (typeof entry === 'number' && Number.isInteger(entry) && entry >= 0 && entry <= 6) {
+        normalizedDays.push(entry);
+        return;
+      }
+
+      const normalizedEntry = String(entry).trim().toLowerCase();
+      if (!normalizedEntry) return;
+      if (dayMap.has(normalizedEntry)) {
+        const mappedValue = dayMap.get(normalizedEntry);
+        if (Array.isArray(mappedValue)) {
+          normalizedDays.push(...mappedValue);
+        } else {
+          normalizedDays.push(mappedValue);
+        }
+      }
+    });
+
+    return Array.from(new Set(normalizedDays));
+  }
+
+  getLocalizedWeekdayMap(localeOverride = null) {
+    const locale = resolveLanguage(localeOverride || this.getLocale());
+    const cacheKey = locale || 'default';
+    if (!this._localizedWeekdayMapCache) this._localizedWeekdayMapCache = new Map();
+    if (this._localizedWeekdayMapCache.has(cacheKey)) return this._localizedWeekdayMapCache.get(cacheKey);
+
+    const map = new Map();
+    const formats = ['long', 'short', 'narrow'];
+    const anchorSunday = new Date(Date.UTC(2024, 0, 7)); // Sunday
+
+    formats.forEach((weekdayFormat) => {
+      for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+        const date = new Date(anchorSunday);
+        date.setUTCDate(anchorSunday.getUTCDate() + dayIndex);
+        const localizedName = new Intl.DateTimeFormat(locale, { weekday: weekdayFormat, timeZone: 'UTC' }).format(date);
+        const normalizedName = String(localizedName || '').trim().toLowerCase();
+        if (!normalizedName) continue;
+        if (!map.has(normalizedName)) {
+          map.set(normalizedName, [dayIndex]);
+          continue;
+        }
+        const existingDayIndexes = map.get(normalizedName);
+        if (!existingDayIndexes.includes(dayIndex)) existingDayIndexes.push(dayIndex);
+      }
+    });
+
+    this._localizedWeekdayMapCache.set(cacheKey, map);
+    return map;
   }
 
   normalizeEventStyleBlock(style = {}) {
@@ -1760,6 +1838,7 @@ class SkylightCalendarCard extends HTMLElement {
       if (rule.condition === 'future') matches = dayStart.getTime() > todayStart.getTime();
       if (rule.condition === 'weekend') matches = dayStart.getDay() === 0 || dayStart.getDay() === 6;
       if (rule.condition === 'weekday') matches = dayStart.getDay() !== 0 && dayStart.getDay() !== 6;
+      if (rule.condition === 'day_of_week') matches = Array.isArray(rule.day_of_week) && rule.day_of_week.includes(dayStart.getDay());
       if (rule.condition === 'has_event') {
         matchedEvent = this.findMatchingDayStyleEvent(rule, dayEvents);
         matches = !!matchedEvent;
