@@ -3907,7 +3907,7 @@ class SkylightCalendarCard extends HTMLElement {
         display: flex;
         align-items: center;
         justify-content: center;
-        color: white;
+        color: var(--skylight-calendar-filter-icon-color, white);
         font-size: 11px;
         font-weight: 600;
         overflow: hidden;
@@ -3915,6 +3915,7 @@ class SkylightCalendarCard extends HTMLElement {
 
       .calendar-badge-icon ha-icon {
         --mdc-icon-size: 14px;
+        color: inherit;
       }
 
       .calendar-badge-photo img {
