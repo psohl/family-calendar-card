@@ -756,7 +756,6 @@ class SkylightCalendarCard extends HTMLElement {
     this._combinedEditTargets = null;
     this._combinedDeleteTargets = null;
     this._pendingHeaderSensorRender = false;
-    this._backgroundImageAverageColor = null;
     this._weatherForecastByEntity = new Map();
     this._weatherForecastSubscriptionEntityId = null;
     this._weatherForecastUnsubscribe = null;
@@ -1020,7 +1019,6 @@ class SkylightCalendarCard extends HTMLElement {
 
   setConfig(config) {
     const previousHeaderWeatherSensor = this._config?.header_weather_sensor || null;
-    const previousBackgroundImageUrl = this.normalizeBackgroundImageUrl(this._config?.background_image_url);
     if (!config.entities || !Array.isArray(config.entities)) {
       throw new Error('You need to define calendar entities');
     }
@@ -1193,10 +1191,6 @@ class SkylightCalendarCard extends HTMLElement {
       this._weatherForecastRefreshRetryAtByEntity.clear();
     }
     this.ensureWeatherForecastSubscription();
-    const nextBackgroundImageUrl = this.normalizeBackgroundImageUrl(this._config?.background_image_url);
-    if (previousBackgroundImageUrl !== nextBackgroundImageUrl) {
-      this.refreshBackgroundImageAverageColor();
-    }
     this.setWeekStart();
     this.resetAgendaWindowToToday();
     this.render();
@@ -1382,25 +1376,6 @@ class SkylightCalendarCard extends HTMLElement {
     return this.resolveComputedCssColorToRgb(normalizedColor);
   }
 
-  colorToRgba(color) {
-    if (!color || typeof color !== 'string') return null;
-    const trimmed = color.trim();
-    const rgbaMatch = trimmed.match(/^rgba?\(([^)]+)\)$/i);
-    if (rgbaMatch) {
-      const parts = rgbaMatch[1].split(',').map((part) => part.trim());
-      if (parts.length < 3) return null;
-      const r = Number(parts[0]);
-      const g = Number(parts[1]);
-      const b = Number(parts[2]);
-      const a = parts.length >= 4 ? Number(parts[3]) : 1;
-      if (![r, g, b, a].every(Number.isFinite)) return null;
-      return { r, g, b, a: Math.max(0, Math.min(1, a)) };
-    }
-
-    const rgb = this.colorToRgb(trimmed);
-    if (!rgb) return null;
-    return { ...rgb, a: 1 };
-  }
 
   resolveComputedCssColorToRgb(color) {
     if (typeof color !== 'string' || typeof window === 'undefined' || typeof document === 'undefined') {
@@ -1450,55 +1425,6 @@ class SkylightCalendarCard extends HTMLElement {
     };
   }
 
-  getBackgroundImageAverageColor() {
-    return this._backgroundImageAverageColor || null;
-  }
-
-  async refreshBackgroundImageAverageColor() {
-    const normalizedBackgroundImageUrl = this.normalizeBackgroundImageUrl(this._config?.background_image_url);
-    if (!normalizedBackgroundImageUrl) {
-      this._backgroundImageAverageColor = null;
-      return;
-    }
-    if (typeof Image === 'undefined' || typeof document === 'undefined') {
-      this._backgroundImageAverageColor = null;
-      return;
-    }
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    const average = await new Promise((resolve) => {
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          const width = Math.max(1, Math.min(64, img.naturalWidth || 1));
-          const height = Math.max(1, Math.min(64, img.naturalHeight || 1));
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-          if (!ctx) return resolve(null);
-          ctx.drawImage(img, 0, 0, width, height);
-          const { data } = ctx.getImageData(0, 0, width, height);
-          let r = 0; let g = 0; let b = 0; let count = 0;
-          for (let i = 0; i < data.length; i += 4) {
-            const alpha = data[i + 3] / 255;
-            if (alpha <= 0) continue;
-            r += data[i] * alpha;
-            g += data[i + 1] * alpha;
-            b += data[i + 2] * alpha;
-            count += alpha;
-          }
-          if (count <= 0) return resolve(null);
-          resolve({ r: Math.round(r / count), g: Math.round(g / count), b: Math.round(b / count) });
-        } catch (_error) {
-          resolve(null);
-        }
-      };
-      img.onerror = () => resolve(null);
-      img.src = normalizedBackgroundImageUrl;
-    });
-    this._backgroundImageAverageColor = average;
-    this.render();
-  }
 
   normalizeCombineStyle(styleValue) {
     const normalized = String(styleValue || '').trim().toLowerCase();
@@ -6461,17 +6387,7 @@ class SkylightCalendarCard extends HTMLElement {
       return configuredColor;
     }
 
-    return this.getContractColor(this.getAutoEventTextContrastBackground(event));
-  }
-
-  getAutoEventTextContrastBackground(event) {
-    const eventBackgroundColor = this.getEventBackgroundColor(event);
-    const eventRgba = this.colorToRgba(eventBackgroundColor);
-    if (!eventRgba) return eventBackgroundColor;
-
-    const baseBackgroundRgb = this.getBaseCardBackgroundRgb();
-    const stackedBackgroundRgb = this.blendRgb(eventRgba, baseBackgroundRgb, eventRgba.a) || eventRgba;
-    return `rgb(${stackedBackgroundRgb.r}, ${stackedBackgroundRgb.g}, ${stackedBackgroundRgb.b})`;
+    return this.getContractColor(this.getEventBackgroundColor(event));
   }
 
   shouldShowEventTime(event) {
@@ -7164,24 +7080,15 @@ class SkylightCalendarCard extends HTMLElement {
     const tintOpacity = Number.isFinite(Number(this._config?.event_tint_opacity))
       ? Math.max(0, Math.min(1, Number(this._config.event_tint_opacity)))
       : 0.2;
-    const tintColor = this.colorWithAlpha(primaryColor, tintOpacity);
-    const tintRgba = this.colorToRgba(tintColor);
-    const baseBackgroundRgb = this.getBaseCardBackgroundRgb();
-    if (!tintRgba || !baseBackgroundRgb) return tintColor;
-    const composed = this.blendRgb(tintRgba, baseBackgroundRgb, tintRgba.a) || tintRgba;
+    const baseTintMix = this._isDarkMode ? 0.32 : 0.2;
+    const mixStrength = Math.min(0.7, Math.max(0.08, tintOpacity + (this._isDarkMode ? 0.12 : 0)));
+    const mixRgb = this._isDarkMode
+      ? { r: 42, g: 47, b: 54 }
+      : { r: 255, g: 255, b: 255 };
+    const primaryRgb = this.colorToRgb(primaryColor);
+    if (!primaryRgb) return this.colorWithAlpha(primaryColor, tintOpacity);
+    const composed = this.blendRgb(mixRgb, primaryRgb, Math.max(baseTintMix, mixStrength));
     return `rgb(${composed.r}, ${composed.g}, ${composed.b})`;
-  }
-
-  getBaseCardBackgroundRgb() {
-    const themeCardBackground = this._isDarkMode ? '#2a2f36' : '#ffffff';
-    const themeCardRgb = this.colorToRgb(themeCardBackground);
-    const cardBackgroundOpacity = this.normalizeBackgroundOpacity(
-      this._config?.background_opacity,
-      this._config?.background_transparent ? 100 : 0
-    );
-    const imageBackgroundAlpha = cardBackgroundOpacity / 100;
-    const imageAverageRgb = this.getBackgroundImageAverageColor();
-    return this.blendRgb(imageAverageRgb, themeCardRgb, imageBackgroundAlpha) || themeCardRgb;
   }
 
   getEventColorBarWidth() {
@@ -10903,9 +10810,9 @@ class SkylightCalendarCardEditor extends HTMLElement {
         <div class="field field-inline">
           <label for="event_color_mode">Event color style</label>
           <select id="event_color_mode" data-field="event_color_mode">
-            <option value="classic" ${this._config.event_color_mode === 'classic' ? 'selected' : ''}>Calendar color background (current)</option>
-            <option value="left-neutral" ${this._config.event_color_mode === 'left-neutral' ? 'selected' : ''}>Calendar color left bar + neutral background</option>
-            <option value="left-tint" ${this._config.event_color_mode === 'left-tint' ? 'selected' : ''}>Calendar color left bar + light calendar tint</option>
+            <option value="classic" ${this._config.event_color_mode === 'classic' ? 'selected' : ''}>Classic</option>
+            <option value="left-neutral" ${this._config.event_color_mode === 'left-neutral' ? 'selected' : ''}>Bar + Neutral</option>
+            <option value="left-tint" ${this._config.event_color_mode === 'left-tint' ? 'selected' : ''}>Bar + Tint</option>
           </select>
         </div>
       </div>
