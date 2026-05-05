@@ -11698,6 +11698,18 @@ class SkylightCalendarCardEditor extends HTMLElement {
       nextConfig[field] = this.parseList(event.target.value);
     } else {
       nextConfig[field] = event.target.value;
+      if (field === 'event_color_mode') {
+        this._config = nextConfig;
+        this.render();
+        this.dispatchEvent(
+          new CustomEvent('config-changed', {
+            detail: { config: nextConfig },
+            bubbles: true,
+            composed: true
+          })
+        );
+        return;
+      }
     }
 
     this._config = nextConfig;
