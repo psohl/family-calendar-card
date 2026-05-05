@@ -1139,7 +1139,7 @@ class SkylightCalendarCard extends HTMLElement {
       event_color_bar_width: normalizedEventBarWidth, // Left accent width for split event color modes
       event_color_mode: this.normalizeEventColorMode(config.event_color_mode ?? 'classic'), // Event color rendering mode
       event_neutral_background: this.normalizeSingleColor(config.event_neutral_background) || '#F8F3E9', // Neutral background for split color event mode
-      event_tint_opacity: Number.isFinite(Number(config.event_tint_opacity)) ? Math.max(0, Math.min(1, Number(config.event_tint_opacity))) : 0.2, // Tint opacity for split color event mode
+      event_tint_opacity: this.normalizeBackgroundOpacity(config.event_tint_opacity, 80), // Tint transparency for split color event mode (0=opaque, 100=transparent)
       enable_event_management: config.enable_event_management !== false, // Enable create/edit/delete
       readonly_calendars: config.readonly_calendars || [], // Calendars that should not allow modifications
       hide_badge_calendars: config.hide_badge_calendars || [], // Calendars whose badges should be hidden from the header
@@ -1169,7 +1169,7 @@ class SkylightCalendarCard extends HTMLElement {
       ,
       event_color_mode: this.normalizeEventColorMode(config.event_color_mode ?? 'classic'),
       event_neutral_background: this.normalizeSingleColor(config.event_neutral_background) || '#F8F3E9',
-      event_tint_opacity: Number.isFinite(Number(config.event_tint_opacity)) ? Math.max(0, Math.min(1, Number(config.event_tint_opacity))) : 0.2,
+      event_tint_opacity: this.normalizeBackgroundOpacity(config.event_tint_opacity, 80),
       combine_calendars_width: normalizedCombineWidth,
       event_color_bar_width: normalizedEventBarWidth
     };
@@ -7077,9 +7077,8 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   getEventTintBackgroundColor(primaryColor) {
-    const tintOpacity = Number.isFinite(Number(this._config?.event_tint_opacity))
-      ? Math.max(0, Math.min(1, Number(this._config.event_tint_opacity)))
-      : 0.2;
+    const tintTransparency = this.normalizeBackgroundOpacity(this._config?.event_tint_opacity, 80);
+    const tintOpacity = 1 - (tintTransparency / 100);
     const baseTintMix = this._isDarkMode ? 0.32 : 0.2;
     const mixStrength = Math.min(0.7, Math.max(0.08, tintOpacity + (this._isDarkMode ? 0.12 : 0)));
     const mixRgb = this._isDarkMode
@@ -10041,7 +10040,7 @@ class SkylightCalendarCard extends HTMLElement {
       combine_background: 'primary',
       event_color_mode: 'classic',
       event_neutral_background: '#F8F3E9',
-      event_tint_opacity: 0.2,
+      event_tint_opacity: 80,
       event_color_bar_width: 18,
       hide_calendars: false,
       hide_year: false,
@@ -10239,7 +10238,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
       event_location_font_size: 9,
       combine_calendars_width: 18,
       event_color_bar_width: 18,
-      event_tint_opacity: 0.2,
+      event_tint_opacity: 80,
       max_events: 0,
       first_day_of_week: 0,
       header_background_opacity: 0,
@@ -10830,8 +10829,8 @@ class SkylightCalendarCardEditor extends HTMLElement {
       ${this._config.event_color_mode === 'left-tint' ? `
       <div class="field-row">
         <div class="field field-inline">
-          <label for="event_tint_opacity">Tint opacity (0.0 - 1.0)</label>
-          <input id="event_tint_opacity" data-field="event_tint_opacity" data-type="number" type="number" min="0" max="1" step="0.05" value="${Number(this._config.event_tint_opacity ?? 0.2)}">
+          <label for="event_tint_opacity">Tint opacity</label>
+          <input id="event_tint_opacity" data-field="event_tint_opacity" data-type="number" type="number" min="0" max="100" step="1" value="${Number(this._config.event_tint_opacity ?? 80)}">
         </div>
       </div>
       ` : ''}
@@ -11683,6 +11682,8 @@ class SkylightCalendarCardEditor extends HTMLElement {
         } else if (field === 'background_opacity') {
           nextConfig.background_opacity = this.normalizeBackgroundOpacity(parsedValue, 0);
           nextConfig.background_transparent = nextConfig.background_opacity >= 100;
+        } else if (field === 'event_tint_opacity') {
+          nextConfig.event_tint_opacity = this.normalizeBackgroundOpacity(parsedValue, 80);
         } else {
           nextConfig[field] = parsedValue;
         }
