@@ -7079,14 +7079,12 @@ class SkylightCalendarCard extends HTMLElement {
   getEventTintBackgroundColor(primaryColor) {
     const tintTransparency = this.normalizeBackgroundOpacity(this._config?.event_tint_opacity, 80);
     const tintOpacity = 1 - (tintTransparency / 100);
-    const baseTintMix = this._isDarkMode ? 0.32 : 0.2;
-    const mixStrength = Math.min(0.7, Math.max(0.08, tintOpacity + (this._isDarkMode ? 0.12 : 0)));
-    const mixRgb = this._isDarkMode
+    const baseRgb = this._isDarkMode
       ? { r: 42, g: 47, b: 54 }
       : { r: 255, g: 255, b: 255 };
     const primaryRgb = this.colorToRgb(primaryColor);
     if (!primaryRgb) return this.colorWithAlpha(primaryColor, tintOpacity);
-    const composed = this.blendRgb(mixRgb, primaryRgb, Math.max(baseTintMix, mixStrength));
+    const composed = this.blendRgb(primaryRgb, baseRgb, tintOpacity);
     return `rgb(${composed.r}, ${composed.g}, ${composed.b})`;
   }
 
