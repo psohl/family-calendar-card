@@ -1058,6 +1058,17 @@ class SkylightCalendarCard extends HTMLElement {
       : 23;
     const normalizedEventTitlePrefix = this.normalizeEventTitlePrefixMode(config.event_title_prefix);
 
+    const rawCombineWidth = Number(config.combine_calendars_width);
+    const rawEventBarWidth = Number(config.event_color_bar_width);
+    const hasCombineWidth = Number.isFinite(rawCombineWidth) && rawCombineWidth > 0;
+    const hasEventBarWidth = Number.isFinite(rawEventBarWidth) && rawEventBarWidth > 0;
+    const normalizedCombineWidth = hasCombineWidth
+      ? rawCombineWidth
+      : (hasEventBarWidth ? rawEventBarWidth : 18);
+    const normalizedEventBarWidth = hasEventBarWidth
+      ? rawEventBarWidth
+      : normalizedCombineWidth;
+
     this._config = {
       title: this._hasCustomTitle ? config.title : translate(language, 'defaultTitle'),
       entities: config.entities,
@@ -1124,7 +1135,11 @@ class SkylightCalendarCard extends HTMLElement {
       combine_calendars: config.combine_calendars ?? false, // Combine exact duplicate events across calendars with zebra striping
       combine_style: this.normalizeCombineStyle(config.combine_style ?? 'bars'), // Visual treatment for merged calendar events
       combine_background: this.normalizeCombineBackground(config.combine_background ?? 'primary'), // Background for merged events: neutral, primary, or hex
-      combine_calendars_width: config.combine_calendars_width ?? 18, // Stripe width in pixels for combined calendar zebra styling
+      combine_calendars_width: normalizedCombineWidth, // Stripe width in pixels for combined calendar zebra styling
+      event_color_bar_width: normalizedEventBarWidth, // Left accent width for split event color modes
+      event_color_mode: this.normalizeEventColorMode(config.event_color_mode ?? 'classic'), // Event color rendering mode
+      event_neutral_background: this.normalizeSingleColor(config.event_neutral_background) || '#F8F3E9', // Neutral background for split color event mode
+      event_tint_opacity: this.normalizeBackgroundOpacity(config.event_tint_opacity, 80), // Tint transparency for split color event mode (0=opaque, 100=transparent)
       enable_event_management: config.enable_event_management !== false, // Enable create/edit/delete
       readonly_calendars: config.readonly_calendars || [], // Calendars that should not allow modifications
       hide_badge_calendars: config.hide_badge_calendars || [], // Calendars whose badges should be hidden from the header
@@ -1151,6 +1166,12 @@ class SkylightCalendarCard extends HTMLElement {
       agenda_compact_events: config.agenda_compact_events ?? false,
       event_styles: normalizedEventStyles,
       day_styles: normalizedDayStyles
+      ,
+      event_color_mode: this.normalizeEventColorMode(config.event_color_mode ?? 'classic'),
+      event_neutral_background: this.normalizeSingleColor(config.event_neutral_background) || '#F8F3E9',
+      event_tint_opacity: this.normalizeBackgroundOpacity(config.event_tint_opacity, 80),
+      combine_calendars_width: normalizedCombineWidth,
+      event_color_bar_width: normalizedEventBarWidth
     };
     if (!Object.prototype.hasOwnProperty.call(config, 'use_24hr_schedule')) {
       delete this._config.use_24hr_schedule; // Preserve locale-based hour cycle defaults when unset
@@ -1355,6 +1376,7 @@ class SkylightCalendarCard extends HTMLElement {
     return this.resolveComputedCssColorToRgb(normalizedColor);
   }
 
+
   resolveComputedCssColorToRgb(color) {
     if (typeof color !== 'string' || typeof window === 'undefined' || typeof document === 'undefined') {
       return null;
@@ -1391,9 +1413,28 @@ class SkylightCalendarCard extends HTMLElement {
     return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${clamped})`;
   }
 
+  blendRgb(top, bottom, topAlpha = 1) {
+    if (!top && !bottom) return null;
+    if (!top) return bottom;
+    if (!bottom) return top;
+    const clampedAlpha = Math.max(0, Math.min(1, topAlpha));
+    return {
+      r: Math.round((top.r * clampedAlpha) + (bottom.r * (1 - clampedAlpha))),
+      g: Math.round((top.g * clampedAlpha) + (bottom.g * (1 - clampedAlpha))),
+      b: Math.round((top.b * clampedAlpha) + (bottom.b * (1 - clampedAlpha)))
+    };
+  }
+
+
   normalizeCombineStyle(styleValue) {
     const normalized = String(styleValue || '').trim().toLowerCase();
     return ['stripes', 'bars', 'dots'].includes(normalized) ? normalized : 'bars';
+  }
+
+  normalizeEventColorMode(modeValue) {
+    const normalized = String(modeValue || '').trim().toLowerCase();
+    if (normalized === 'left-neutral' || normalized === 'left-tint') return normalized;
+    return 'classic';
   }
 
   normalizeCombineBackground(backgroundValue) {
@@ -7030,11 +7071,43 @@ class SkylightCalendarCard extends HTMLElement {
     return option;
   }
 
+  getEventNeutralBackgroundColor() {
+    const normalized = this.normalizeSingleColor(this._config?.event_neutral_background);
+    return normalized || '#F8F3E9';
+  }
+
+  getEventTintBackgroundColor(primaryColor) {
+    const tintTransparency = this.normalizeBackgroundOpacity(this._config?.event_tint_opacity, 80);
+    const tintOpacity = 1 - (tintTransparency / 100);
+    const baseRgb = this._isDarkMode
+      ? { r: 42, g: 47, b: 54 }
+      : { r: 255, g: 255, b: 255 };
+    const primaryRgb = this.colorToRgb(primaryColor);
+    if (!primaryRgb) return this.colorWithAlpha(primaryColor, tintOpacity);
+    const composed = this.blendRgb(primaryRgb, baseRgb, tintOpacity);
+    return `rgb(${composed.r}, ${composed.g}, ${composed.b})`;
+  }
+
+  getEventColorBarWidth() {
+    const configuredWidth = Number(this._config?.event_color_bar_width);
+    if (Number.isFinite(configuredWidth) && configuredWidth > 0) return configuredWidth;
+    const combineWidth = Number(this._config?.combine_calendars_width);
+    if (Number.isFinite(combineWidth) && combineWidth > 0) return combineWidth;
+    return 18;
+  }
+
   getEventBackgroundColor(event) {
     const visibleColors = this.getVisibleCalendarColorsForEvent(event);
     const primaryColor = visibleColors[0] || event?.color || '#3b82f6';
+    const eventColorMode = this.normalizeEventColorMode(this._config?.event_color_mode);
 
     if (visibleColors.length <= 1) {
+      if (eventColorMode === 'left-neutral') {
+        return this.getEventNeutralBackgroundColor();
+      }
+      if (eventColorMode === 'left-tint') {
+        return this.getEventTintBackgroundColor(primaryColor);
+      }
       return primaryColor;
     }
 
@@ -7078,7 +7151,16 @@ class SkylightCalendarCard extends HTMLElement {
       ? `border-left: 4px solid ${primaryColor};`
       : 'border-left: none;';
 
+    const eventColorMode = this.normalizeEventColorMode(this._config?.event_color_mode);
     if (visibleColors.length <= 1) {
+      if (eventColorMode === 'left-neutral') {
+        const barWidth = this.getEventColorBarWidth();
+        return `--combine-left-offset: ${barWidth}px; background-color: ${this.getEventNeutralBackgroundColor()}; background-image: linear-gradient(to right, ${primaryColor} 0 ${barWidth}px, transparent ${barWidth}px); background-size: ${barWidth}px 100%; background-position: left top; background-repeat: no-repeat; background-clip: padding-box; ${borderStyle}`;
+      }
+      if (eventColorMode === 'left-tint') {
+        const barWidth = this.getEventColorBarWidth();
+        return `--combine-left-offset: ${barWidth}px; background-color: ${this.getEventTintBackgroundColor(primaryColor)}; background-image: linear-gradient(to right, ${primaryColor} 0 ${barWidth}px, transparent ${barWidth}px); background-size: ${barWidth}px 100%; background-position: left top; background-repeat: no-repeat; background-clip: padding-box; ${borderStyle}`;
+      }
       return `background-color: ${primaryColor}; background-image: none; background-clip: padding-box; ${borderStyle}`;
     }
 
@@ -9954,6 +10036,10 @@ class SkylightCalendarCard extends HTMLElement {
       event_title_prefix: 'none',
       combine_style: 'bars',
       combine_background: 'primary',
+      event_color_mode: 'classic',
+      event_neutral_background: '#F8F3E9',
+      event_tint_opacity: 80,
+      event_color_bar_width: 18,
       hide_calendars: false,
       hide_year: false,
       hide_controls: false,
@@ -10149,6 +10235,8 @@ class SkylightCalendarCardEditor extends HTMLElement {
       event_time_font_size: 9,
       event_location_font_size: 9,
       combine_calendars_width: 18,
+      event_color_bar_width: 18,
+      event_tint_opacity: 80,
       max_events: 0,
       first_day_of_week: 0,
       header_background_opacity: 0,
@@ -10255,6 +10343,9 @@ class SkylightCalendarCardEditor extends HTMLElement {
 
   emitConfigChanged(nextConfig) {
     this._config = nextConfig;
+    if (field === 'event_color_mode') {
+      this.render();
+    }
     this.dispatchEvent(
       new CustomEvent('config-changed', {
         detail: { config: nextConfig },
@@ -10715,6 +10806,40 @@ class SkylightCalendarCardEditor extends HTMLElement {
           </select>
         </div>
       </div>
+      <div class="field-row">
+        <div class="field field-inline">
+          <label for="event_color_mode">Event color style</label>
+          <select id="event_color_mode" data-field="event_color_mode">
+            <option value="classic" ${this._config.event_color_mode === 'classic' ? 'selected' : ''}>Classic</option>
+            <option value="left-neutral" ${this._config.event_color_mode === 'left-neutral' ? 'selected' : ''}>Bar + Neutral</option>
+            <option value="left-tint" ${this._config.event_color_mode === 'left-tint' ? 'selected' : ''}>Bar + Tint</option>
+          </select>
+        </div>
+      </div>
+      ${this._config.event_color_mode === 'left-neutral' ? `
+      <div class="field-row">
+        <div class="field field-inline">
+          <label for="event_neutral_background">Neutral event background color</label>
+          ${this.renderColorInputControl({ id: 'event_neutral_background', field: 'event_neutral_background', value: this._config.event_neutral_background || '#F8F3E9' })}
+        </div>
+      </div>
+      ` : ''}
+      ${this._config.event_color_mode === 'left-tint' ? `
+      <div class="field-row">
+        <div class="field field-inline">
+          <label for="event_tint_opacity">Tint opacity</label>
+          <input id="event_tint_opacity" data-field="event_tint_opacity" data-type="number" type="number" min="0" max="100" step="1" value="${Number(this._config.event_tint_opacity ?? 80)}">
+        </div>
+      </div>
+      ` : ''}
+      ${this._config.event_color_mode !== 'classic' ? `
+      <div class="field-row">
+        <div class="field field-inline">
+          <label for="event_color_bar_width">Event color bar width (px)</label>
+          <input id="event_color_bar_width" data-field="event_color_bar_width" data-type="number" type="number" min="1" value="${Number(this._config.event_color_bar_width ?? this._config.combine_calendars_width ?? 18)}">
+        </div>
+      </div>
+      ` : ''}
       ${this.renderSubSection('Hide times for calendars', `<div class="list-checkbox-grid">${this.renderCalendarListCheckboxes('hide_times_for_calendars', { label: 'hidden times calendars' })}</div>`)}
       <div class="boolean-list">
         <label><input type="checkbox" data-field="show_current_time_bar" ${this._config.show_current_time_bar ? 'checked' : ''}> Show current time bar</label>
@@ -11555,6 +11680,8 @@ class SkylightCalendarCardEditor extends HTMLElement {
         } else if (field === 'background_opacity') {
           nextConfig.background_opacity = this.normalizeBackgroundOpacity(parsedValue, 0);
           nextConfig.background_transparent = nextConfig.background_opacity >= 100;
+        } else if (field === 'event_tint_opacity') {
+          nextConfig.event_tint_opacity = this.normalizeBackgroundOpacity(parsedValue, 80);
         } else {
           nextConfig[field] = parsedValue;
         }
@@ -11570,6 +11697,18 @@ class SkylightCalendarCardEditor extends HTMLElement {
       nextConfig[field] = this.parseList(event.target.value);
     } else {
       nextConfig[field] = event.target.value;
+      if (field === 'event_color_mode') {
+        this._config = nextConfig;
+        this.render();
+        this.dispatchEvent(
+          new CustomEvent('config-changed', {
+            detail: { config: nextConfig },
+            bubbles: true,
+            composed: true
+          })
+        );
+        return;
+      }
     }
 
     this._config = nextConfig;

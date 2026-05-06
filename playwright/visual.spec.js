@@ -1,6 +1,5 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
-const fs = require('fs');
 
 const FIXED_NOW = '2026-03-15T10:00:00.000Z';
 
@@ -42,6 +41,8 @@ const cases = [
   { name: 'agenda-basic-dark', config: { default_view: 'agenda', color_scheme: 'dark' }, darkMode: true, events: baseEvents, viewLabel: 'Agenda' },
   { name: 'multi-combined', config: { default_view: 'week', combine_calendars: true, combine_style: 'zebra', combine_background: '#d7ebff' }, darkMode: false, events: baseEvents, viewLabel: 'Week' },
   { name: 'multi-split', config: { default_view: 'week', combine_calendars: false }, darkMode: false, events: baseEvents, viewLabel: 'Week' },
+  { name: 'event-left-neutral-week', config: { default_view: 'week', event_color_mode: 'left-neutral', event_neutral_background: '#F8F3E9', event_color_bar_width: 18, colors: { 'calendar.family': '#ff5f66', 'calendar.work': '#14c8bd' } }, darkMode: false, events: baseEvents, viewLabel: 'Week' },
+  { name: 'event-left-tint-schedule', config: { default_view: 'schedule', event_color_mode: 'left-tint', event_tint_opacity: 100, event_color_bar_width: 18, colors: { 'calendar.family': '#ff5f66', 'calendar.work': '#14c8bd' } }, darkMode: false, events: baseEvents, viewLabel: 'Schedule' },
   { name: 'virtual-calendars', config: { default_view: 'schedule', virtual_calendars: [{ name: 'home+work', icon: 'mdi:calendar', entities: ['calendar.family', 'calendar.work'] }] }, darkMode: false, events: baseEvents, viewLabel: 'Schedule' },
   { name: 'styled-events-days', config: { default_view: 'month', event_styles: [{ when: { title_contains: 'Standup' }, style: { background: '#f8d7da', color: '#721c24' } }], day_styles: [{ when: { day_of_week: [0] }, style: { background: '#f4f7ff' } }] }, darkMode: false, events: baseEvents, viewLabel: 'Month' },
   { name: 'hostile-dataset', config: { default_view: 'agenda', combine_calendars: true }, darkMode: false, events: hostileEvents, viewLabel: 'Agenda' },
@@ -84,7 +85,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const scenario of cases) {
-  test(`visual: ${scenario.name}`, async ({ page }, testInfo) => {
+  test(`visual: ${scenario.name}`, async ({ page }) => {
     const fixtureUrl = `file://${path.join(process.cwd(), 'playwright', 'ha-fixture.html')}`;
     await page.goto(fixtureUrl);
     await page.evaluate((params) => window.renderCalendarCard(params), {
@@ -108,22 +109,9 @@ for (const scenario of cases) {
     const eventSelector = eventSelectorByView[view] || '.event';
     expect(await card.locator(eventSelector).count()).toBeGreaterThan(0);
 
-    const snapshotName = `${scenario.name}.png`;
-    const snapshotPath = testInfo.snapshotPath(snapshotName);
-    if (fs.existsSync(snapshotPath)) {
-      await expect(card).toHaveScreenshot(snapshotName, {
-        animations: 'disabled',
-        maxDiffPixelRatio: 0.01
-      });
-    } else {
-      await card.screenshot({
-        path: testInfo.outputPath(`${scenario.name}-actual.png`),
-        animations: 'disabled'
-      });
-      testInfo.annotations.push({
-        type: 'warning',
-        description: `Snapshot missing for ${scenario.name}; captured actual screenshot for bootstrap.`
-      });
-    }
+    await expect(card).toHaveScreenshot(`${scenario.name}.png`, {
+      animations: 'disabled',
+      maxDiffPixelRatio: 0.01
+    });
   });
 }
