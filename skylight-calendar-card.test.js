@@ -66,7 +66,8 @@ test('getStubConfig includes key configuration defaults', () => {
     'lock_schedule_hours', 'show_all_events_month', 'show_all_details_month',
     'hide_empty_days', 'agenda_compact_events', 'compact_width',
     'show_current_time_bar', 'show_event_location', 'use_short_location',
-    'event_calendar_friendly_name', 'event_title_prefix', 'combine_style',
+    'event_calendar_friendly_name', 'event_title_prefix', 'event_color_mode',
+    'event_neutral_background', 'event_tint_opacity', 'event_color_bar_width', 'combine_style',
     'combine_background', 'hide_calendars', 'hide_year', 'hide_controls',
     'hide_dark_mode_toggle', 'show_dashboard_nav_button', 'header_dashboard_path',
     'header_weather_sensor', 'color_scheme', 'enable_event_management'
@@ -109,6 +110,10 @@ test('setConfig applies visual layout and styling options', () => {
     combine_style: 'zebra',
     combine_background: '#abcdef',
     combine_calendars_width: 26,
+    event_color_mode: 'left-tint',
+    event_neutral_background: '#F8F3E9',
+    event_tint_opacity: 25,
+    event_color_bar_width: 12,
     color_scheme: 'dark',
     calendar_badge_icons: { 'calendar.family': 'mdi:home' },
     colors: { 'calendar.family': '#f00' },
@@ -151,6 +156,10 @@ test('setConfig applies visual layout and styling options', () => {
   assert.equal(card._config.combine_style, 'zebra');
   assert.equal(card._config.combine_background, '#abcdef');
   assert.equal(card._config.combine_calendars_width, 26);
+  assert.equal(card._config.event_color_mode, 'left-tint');
+  assert.equal(card._config.event_neutral_background, '#F8F3E9');
+  assert.equal(card._config.event_tint_opacity, 25);
+  assert.equal(card._config.event_color_bar_width, 12);
   assert.equal(card._config.color_scheme, 'dark');
   assert.equal(card._config.calendar_badge_icons['calendar.family'], 'mdi:home');
   assert.equal(card._config.colors['calendar.family'], '#f00');
@@ -174,6 +183,32 @@ test('setConfig normalizes fallback values and aliases', () => {
   assert.equal(card._config.header_background_opacity, 100);
   assert.equal(card._config.event_title_prefix, 'none');
   assert.equal(card._config.color_scheme, 'auto');
+});
+
+
+test('event color modes normalize widths and tint opacity endpoints', () => {
+  const event = { entityId: 'calendar.family', color: '#ff0000', summary: 'Test', start: { dateTime: '2026-05-01T10:00:00Z' }, end: { dateTime: '2026-05-01T11:00:00Z' } };
+
+  const opaqueTint = makeCard({ entities: ['calendar.family'], event_color_mode: 'left-tint', event_tint_opacity: 0, event_color_bar_width: 14 });
+  assert.equal(opaqueTint.getEventTintBackgroundColor('#ff0000'), 'rgb(255, 0, 0)');
+  assert.equal(opaqueTint.getEventBackgroundColor(event), 'rgb(255, 0, 0)');
+  assert.match(opaqueTint.getEventStyle(event), /--combine-left-offset: 14px/);
+  assert.match(opaqueTint.getEventStyle(event), /background-color: rgb\(255, 0, 0\)/);
+
+  const transparentTint = makeCard({ entities: ['calendar.family'], event_color_mode: 'left-tint', event_tint_opacity: 100 });
+  assert.equal(transparentTint.getEventTintBackgroundColor('#ff0000'), 'rgb(255, 255, 255)');
+  assert.equal(transparentTint.getEventBackgroundColor(event), 'rgb(255, 255, 255)');
+
+  const darkTransparentTint = makeCard({ entities: ['calendar.family'], color_scheme: 'dark', event_color_mode: 'left-tint', event_tint_opacity: 100 });
+  assert.equal(darkTransparentTint.getEventTintBackgroundColor('#ff0000'), 'rgb(42, 47, 54)');
+
+  const clampedTint = makeCard({ entities: ['calendar.family'], event_color_mode: 'left-tint', event_tint_opacity: 150 });
+  assert.equal(clampedTint._config.event_tint_opacity, 100);
+  assert.equal(clampedTint.getEventTintBackgroundColor('#ff0000'), 'rgb(255, 255, 255)');
+
+  const widthFallback = makeCard({ entities: ['calendar.family'], event_color_mode: 'left-neutral', combine_calendars_width: 22 });
+  assert.equal(widthFallback._config.event_color_bar_width, 22);
+  assert.match(widthFallback.getEventStyle(event), /--combine-left-offset: 22px/);
 });
 
 test('checkAllCalendarCapabilities marks google, caldav, and local capabilities correctly', async () => {
