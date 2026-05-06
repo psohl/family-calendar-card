@@ -34,6 +34,7 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           branch: playwright-baselines
+          base: ${{ github.ref_name }}
           delete-branch: true
           title: Update Playwright visual baselines
           commit-message: Add/update Playwright visual baselines
@@ -42,4 +43,4 @@ jobs:
 
             Review the changed PNGs before merging.
           add-paths: |
-            playwright/**/*-snapshots/*.png
+            playwright/visual.spec.js-snapshots/*.png
