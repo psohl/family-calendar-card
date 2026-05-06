@@ -1,6 +1,5 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
-const fs = require('fs');
 
 const FIXED_NOW = '2026-03-15T10:00:00.000Z';
 
@@ -86,7 +85,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const scenario of cases) {
-  test(`visual: ${scenario.name}`, async ({ page }, testInfo) => {
+  test(`visual: ${scenario.name}`, async ({ page }) => {
     const fixtureUrl = `file://${path.join(process.cwd(), 'playwright', 'ha-fixture.html')}`;
     await page.goto(fixtureUrl);
     await page.evaluate((params) => window.renderCalendarCard(params), {
@@ -110,22 +109,9 @@ for (const scenario of cases) {
     const eventSelector = eventSelectorByView[view] || '.event';
     expect(await card.locator(eventSelector).count()).toBeGreaterThan(0);
 
-    const snapshotName = `${scenario.name}.png`;
-    const snapshotPath = testInfo.snapshotPath(snapshotName);
-    if (fs.existsSync(snapshotPath)) {
-      await expect(card).toHaveScreenshot(snapshotName, {
-        animations: 'disabled',
-        maxDiffPixelRatio: 0.01
-      });
-    } else {
-      await card.screenshot({
-        path: testInfo.outputPath(`${scenario.name}-actual.png`),
-        animations: 'disabled'
-      });
-      testInfo.annotations.push({
-        type: 'warning',
-        description: `Snapshot missing for ${scenario.name}; captured actual screenshot for bootstrap.`
-      });
-    }
+    await expect(card).toHaveScreenshot(`${scenario.name}.png`, {
+      animations: 'disabled',
+      maxDiffPixelRatio: 0.01
+    });
   });
 }
