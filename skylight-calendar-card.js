@@ -8059,7 +8059,7 @@ class SkylightCalendarCard extends HTMLElement {
               <label class="form-label">
                 ${this.t('eventTitle')}<span class="form-required">*</span>
               </label>
-              <input type="text" class="form-input" id="event-title" placeholder="${this.t('eventTitlePlaceholder')}" value="${this.escapeHtml(prefill?.summary || '')}" required />
+              <input type="text" class="form-input" id="event-title" placeholder="${this.escapeHtmlAttribute(this.t('eventTitlePlaceholder'))}" value="${this.escapeHtmlAttribute(prefill?.summary || '')}" required />
             </div>
           </div>
 
@@ -8100,7 +8100,7 @@ class SkylightCalendarCard extends HTMLElement {
               <div class="form-group form-group-inline">
                 <div class="form-inline-row">
                   <label class="form-label">${this.t('recurrenceEvery')}</label>
-                  <input type="number" class="form-input" id="event-recurrence-interval" min="1" value="${this.escapeHtml(recurrenceData.interval || '1')}" />
+                  <input type="number" class="form-input" id="event-recurrence-interval" min="1" value="${this.escapeHtmlAttribute(recurrenceData.interval || '1')}" />
                 </div>
               </div>
             </div>
@@ -8129,7 +8129,7 @@ class SkylightCalendarCard extends HTMLElement {
                   <input type="radio" name="event-recurrence-end-mode" id="event-recurrence-end-on" value="on" ${this.getRecurrenceEndMode(recurrenceData) === 'on' ? 'checked' : ''} />
                   <span>${this.t('recurrenceOn')}</span>
                 </label>
-                <input type="date" class="form-input" id="event-recurrence-until" value="${this.escapeHtml(recurrenceData.untilDate || '')}" ${this.getRecurrenceEndMode(recurrenceData) === 'on' ? '' : 'disabled'} />
+                <input type="date" class="form-input" id="event-recurrence-until" value="${this.escapeHtmlAttribute(recurrenceData.untilDate || '')}" ${this.getRecurrenceEndMode(recurrenceData) === 'on' ? '' : 'disabled'} />
               </div>
               <div class="recurrence-end-row">
                 <label class="recurrence-end-option" for="event-recurrence-end-after">
@@ -8137,7 +8137,7 @@ class SkylightCalendarCard extends HTMLElement {
                   <span>${this.t('recurrenceAfter')}</span>
                 </label>
                 <div class="recurrence-after-input">
-                  <input type="number" class="form-input" id="event-recurrence-count" min="1" placeholder="13" value="${this.escapeHtml(recurrenceData.count || '')}" ${this.getRecurrenceEndMode(recurrenceData) === 'after' ? '' : 'disabled'} />
+                  <input type="number" class="form-input" id="event-recurrence-count" min="1" placeholder="13" value="${this.escapeHtmlAttribute(recurrenceData.count || '')}" ${this.getRecurrenceEndMode(recurrenceData) === 'after' ? '' : 'disabled'} />
                   <span>${this.t('recurrenceOccurrences')}</span>
                 </div>
               </div>
@@ -8181,13 +8181,13 @@ class SkylightCalendarCard extends HTMLElement {
           <div class="form-group form-group-inline">
             <div class="form-inline-row">
               <label class="form-label">${this.t('location')}</label>
-              <input type="text" class="form-input" id="event-location" placeholder="${this.t('locationPlaceholder')}" value="${this.escapeHtml(prefill?.location || '')}" />
+              <input type="text" class="form-input" id="event-location" placeholder="${this.escapeHtmlAttribute(this.t('locationPlaceholder'))}" value="${this.escapeHtmlAttribute(prefill?.location || '')}" />
             </div>
           </div>
 
           <div class="form-group">
             <label class="form-label">${this.t('description')}</label>
-            <textarea class="form-textarea" id="event-description" placeholder="${this.t('descriptionPlaceholder')}">${this.escapeHtml(prefill?.description || '')}</textarea>
+            <textarea class="form-textarea" id="event-description" placeholder="${this.escapeHtmlAttribute(this.t('descriptionPlaceholder'))}">${this.escapeHtml(prefill?.description || '')}</textarea>
           </div>
 
           <div id="form-error" class="error-message" style="display: none;"></div>
@@ -8445,8 +8445,8 @@ class SkylightCalendarCard extends HTMLElement {
                 ${this.t('eventTitle')}<span class="form-required">*</span>
               </label>
               <input type="text" class="form-input" id="event-title"
-                     placeholder="${this.t('eventTitlePlaceholder')}"
-                     value="${this.escapeHtml(event.summary || '')}" required />
+                     placeholder="${this.escapeHtmlAttribute(this.t('eventTitlePlaceholder'))}"
+                     value="${this.escapeHtmlAttribute(event.summary || '')}" required />
             </div>
           </div>
 
@@ -8487,7 +8487,7 @@ class SkylightCalendarCard extends HTMLElement {
               <div class="form-group form-group-inline">
                 <div class="form-inline-row">
                   <label class="form-label">${this.t('recurrenceEvery')}</label>
-                  <input type="number" class="form-input" id="event-recurrence-interval" min="1" value="${this.escapeHtml(recurrenceData.interval || '1')}" />
+                  <input type="number" class="form-input" id="event-recurrence-interval" min="1" value="${this.escapeHtmlAttribute(recurrenceData.interval || '1')}" />
                 </div>
               </div>
             </div>
@@ -8516,7 +8516,7 @@ class SkylightCalendarCard extends HTMLElement {
                   <input type="radio" name="event-recurrence-end-mode" id="event-recurrence-end-on" value="on" ${this.getRecurrenceEndMode(recurrenceData) === 'on' ? 'checked' : ''} />
                   <span>${this.t('recurrenceOn')}</span>
                 </label>
-                <input type="date" class="form-input" id="event-recurrence-until" value="${this.escapeHtml(recurrenceData.untilDate || '')}" ${this.getRecurrenceEndMode(recurrenceData) === 'on' ? '' : 'disabled'} />
+                <input type="date" class="form-input" id="event-recurrence-until" value="${this.escapeHtmlAttribute(recurrenceData.untilDate || '')}" ${this.getRecurrenceEndMode(recurrenceData) === 'on' ? '' : 'disabled'} />
               </div>
               <div class="recurrence-end-row">
                 <label class="recurrence-end-option" for="event-recurrence-end-after">
@@ -8524,7 +8524,7 @@ class SkylightCalendarCard extends HTMLElement {
                   <span>${this.t('recurrenceAfter')}</span>
                 </label>
                 <div class="recurrence-after-input">
-                  <input type="number" class="form-input" id="event-recurrence-count" min="1" placeholder="13" value="${this.escapeHtml(recurrenceData.count || '')}" ${this.getRecurrenceEndMode(recurrenceData) === 'after' ? '' : 'disabled'} />
+                  <input type="number" class="form-input" id="event-recurrence-count" min="1" placeholder="13" value="${this.escapeHtmlAttribute(recurrenceData.count || '')}" ${this.getRecurrenceEndMode(recurrenceData) === 'after' ? '' : 'disabled'} />
                   <span>${this.t('recurrenceOccurrences')}</span>
                 </div>
               </div>
@@ -8569,14 +8569,14 @@ class SkylightCalendarCard extends HTMLElement {
             <div class="form-inline-row">
               <label class="form-label">${this.t('location')}</label>
               <input type="text" class="form-input" id="event-location"
-                     placeholder="${this.t('locationPlaceholder')}"
-                     value="${this.escapeHtml(event.location || '')}" />
+                     placeholder="${this.escapeHtmlAttribute(this.t('locationPlaceholder'))}"
+                     value="${this.escapeHtmlAttribute(event.location || '')}" />
             </div>
           </div>
 
           <div class="form-group">
             <label class="form-label">${this.t('description')}</label>
-            <textarea class="form-textarea" id="event-description" placeholder="${this.t('descriptionPlaceholder')}">${this.escapeHtml(event.description || '')}</textarea>
+            <textarea class="form-textarea" id="event-description" placeholder="${this.escapeHtmlAttribute(this.t('descriptionPlaceholder'))}">${this.escapeHtml(event.description || '')}</textarea>
           </div>
 
           <div id="form-error" class="error-message" style="display: none;"></div>
@@ -10147,6 +10147,17 @@ class SkylightCalendarCard extends HTMLElement {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  escapeHtmlAttribute(text) {
+    const replacements = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    };
+    return String(text ?? '').replace(/[&<>"']/g, (char) => replacements[char]);
   }
 
   normalizeBackgroundImageUrl(url) {

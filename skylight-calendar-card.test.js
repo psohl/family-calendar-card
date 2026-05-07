@@ -310,6 +310,16 @@ test('combine_calendars merges exact duplicates and keeps distinct events', () =
 });
 
 
+
+test('HTML attribute escaping protects quoted event prefill values', () => {
+  const card = makeCard({ entities: ['calendar.a'] });
+
+  assert.equal(
+    card.escapeHtmlAttribute("Team \"sync\" & <review> 'plan'"),
+    'Team &quot;sync&quot; &amp; &lt;review&gt; &#39;plan&#39;'
+  );
+});
+
 test('forward event detects calendars that already contain matching event', () => {
   const card = makeCard({ entities: ['calendar.a', 'calendar.b', 'calendar.c'] });
   const event = {
