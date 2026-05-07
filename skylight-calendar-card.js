@@ -55,6 +55,12 @@ const TRANSLATIONS = {
       cancel: 'Cancel',
       createEvent: 'Create Event',
       creating: 'Creating...',
+      forwardEvent: 'Forward Event',
+      forwardEventTitle: 'Forward Event',
+      forwardEventPrompt: 'Select one or more new calendars to forward this event to.',
+      forwardEventAlreadyExists: 'Already has this event',
+      forwardEventNoNewCalendars: 'Select at least one new calendar to forward this event to.',
+      continue: 'Continue',
       editEvent: 'Edit Event',
       saveChanges: 'Save Changes',
       saving: 'Saving...',
@@ -161,6 +167,12 @@ const TRANSLATIONS = {
       cancel: 'Annuler',
       createEvent: 'Créer un événement',
       creating: 'Création...',
+      forwardEvent: "Transférer l'événement",
+      forwardEventTitle: "Transférer l'événement",
+      forwardEventPrompt: 'Sélectionnez un ou plusieurs nouveaux calendriers vers lesquels transférer cet événement.',
+      forwardEventAlreadyExists: 'Contient déjà cet événement',
+      forwardEventNoNewCalendars: 'Sélectionnez au moins un nouveau calendrier vers lequel transférer cet événement.',
+      continue: 'Continuer',
       editEvent: "Modifier l'événement",
       saveChanges: 'Enregistrer les modifications',
       saving: 'Enregistrement...',
@@ -267,6 +279,12 @@ const TRANSLATIONS = {
       cancel: 'Abbrechen',
       createEvent: 'Termin erstellen',
       creating: 'Wird erstellt...',
+      forwardEvent: 'Termin weiterleiten',
+      forwardEventTitle: 'Termin weiterleiten',
+      forwardEventPrompt: 'Wählen Sie einen oder mehrere neue Kalender aus, an die dieser Termin weitergeleitet werden soll.',
+      forwardEventAlreadyExists: 'Enthält diesen Termin bereits',
+      forwardEventNoNewCalendars: 'Wählen Sie mindestens einen neuen Kalender aus, an den dieser Termin weitergeleitet werden soll.',
+      continue: 'Weiter',
       editEvent: 'Termin bearbeiten',
       saveChanges: 'Änderungen speichern',
       saving: 'Wird gespeichert...',
@@ -373,6 +391,12 @@ const TRANSLATIONS = {
       cancel: 'Annuleren',
       createEvent: 'Afspraak toevoegen',
       creating: 'Aanmaken...',
+      forwardEvent: 'Afspraak doorsturen',
+      forwardEventTitle: 'Afspraak doorsturen',
+      forwardEventPrompt: 'Selecteer een of meer nieuwe agenda’s waarnaar deze afspraak moet worden doorgestuurd.',
+      forwardEventAlreadyExists: 'Bevat deze afspraak al',
+      forwardEventNoNewCalendars: 'Selecteer minstens één nieuwe agenda om deze afspraak naar door te sturen.',
+      continue: 'Doorgaan',
       editEvent: 'Afspraak bewerken',
       saveChanges: 'Wijzigingen opslaan',
       saving: 'Opslaan...',
@@ -478,6 +502,12 @@ const TRANSLATIONS = {
       cancel: 'Cancelar',
       createEvent: 'Crear evento',
       creating: 'Creando...',
+      forwardEvent: 'Reenviar evento',
+      forwardEventTitle: 'Reenviar evento',
+      forwardEventPrompt: 'Selecciona uno o más calendarios nuevos a los que reenviar este evento.',
+      forwardEventAlreadyExists: 'Ya contiene este evento',
+      forwardEventNoNewCalendars: 'Selecciona al menos un calendario nuevo al que reenviar este evento.',
+      continue: 'Continuar',
       editEvent: 'Editar evento',
       saveChanges: 'Guardar cambios',
       saving: 'Guardando...',
@@ -584,6 +614,12 @@ const TRANSLATIONS = {
       cancel: 'Cancel·lar',
       createEvent: 'Crear esdeveniment',
       creating: 'Creant...',
+      forwardEvent: "Reenviar esdeveniment",
+      forwardEventTitle: "Reenviar esdeveniment",
+      forwardEventPrompt: 'Selecciona un o més calendaris nous als quals reenviar aquest esdeveniment.',
+      forwardEventAlreadyExists: 'Ja conté aquest esdeveniment',
+      forwardEventNoNewCalendars: 'Selecciona almenys un calendari nou al qual reenviar aquest esdeveniment.',
+      continue: 'Continuar',
       editEvent: "Editar esdeveniment",
       saveChanges: 'Desar canvis',
       saving: 'Desant...',
@@ -4702,6 +4738,15 @@ class SkylightCalendarCard extends HTMLElement {
         background: #f3f4f6;
       }
 
+      .recurring-option.disabled-option {
+        cursor: not-allowed;
+        opacity: 0.72;
+      }
+
+      .recurring-option.disabled-option:hover {
+        background: transparent;
+      }
+
       .recurring-option:last-child {
         margin-bottom: 0;
       }
@@ -4920,6 +4965,10 @@ class SkylightCalendarCard extends HTMLElement {
       .calendar-container.dark-mode .modal-close:hover,
       .calendar-container.dark-mode .btn-secondary:hover {
         background: #3f4752;
+      }
+
+      .calendar-container.dark-mode .recurring-option.disabled-option:hover {
+        background: transparent;
       }
 
       .calendar-container.dark-mode .day-cell.other-month {
@@ -7913,7 +7962,7 @@ class SkylightCalendarCard extends HTMLElement {
     };
   }
 
-  showCreateEventModal(defaultDate = null, defaultTime = null) {
+  showCreateEventModal(defaultDate = null, defaultTime = null, options = {}) {
 
     const modal = this.getRootElementById('event-modal');
     const content = this.getRootElementById('modal-content');
@@ -7924,11 +7973,16 @@ class SkylightCalendarCard extends HTMLElement {
       return;
     }
 
+    const prefill = options?.prefill || null;
+    const selectedCalendarIds = Array.isArray(options?.selectedCalendarIds)
+      ? options.selectedCalendarIds.filter((entityId) => writableCalendars.includes(entityId))
+      : [];
+
     // Set defaults
     const now = new Date();
-    const startDate = defaultDate ? new Date(defaultDate) : now;
-    const hasExplicitDefaultTime = defaultTime instanceof Date;
-    const startTime = hasExplicitDefaultTime ? new Date(defaultTime) : new Date(startDate);
+    const startDate = prefill?.startDate ? new Date(prefill.startDate) : (defaultDate ? new Date(defaultDate) : now);
+    const hasExplicitDefaultTime = defaultTime instanceof Date || !!prefill?.startDate;
+    const startTime = hasExplicitDefaultTime ? new Date(prefill?.startDate || defaultTime) : new Date(startDate);
 
     // Round to next half hour for timed events
     if (!hasExplicitDefaultTime && (!defaultDate || defaultDate.getHours() !== 0)) {
@@ -7944,11 +7998,16 @@ class SkylightCalendarCard extends HTMLElement {
     startTime.setMilliseconds(0);
 
     // End time is 1 hour after start (for timed events)
-    const endTime = new Date(startTime);
-    endTime.setHours(endTime.getHours() + 1);
+    const endTime = prefill?.endDate ? new Date(prefill.endDate) : new Date(startTime);
+    if (!prefill?.endDate) {
+      endTime.setHours(endTime.getHours() + 1);
+    }
 
     // For all-day events, show same day to user (we'll add +1 when submitting)
-    const endDate = new Date(startDate);
+    const endDate = prefill?.endDate ? new Date(prefill.endDate) : new Date(startDate);
+    const recurrenceData = this.parseRRule(prefill?.rrule || '');
+    const isPrefilledRecurring = !!prefill?.rrule;
+    const isPrefilledAllDay = !!prefill?.isAllDay;
 
     // Format for datetime-local input
     const formatDateTimeLocal = (date) => {
@@ -7986,7 +8045,7 @@ class SkylightCalendarCard extends HTMLElement {
                       type="checkbox"
                       class="form-checkbox create-event-calendar"
                       value="${entityId}"
-                      ${index === 0 ? 'checked' : ''}
+                      ${(selectedCalendarIds.length > 0 ? selectedCalendarIds.includes(entityId) : index === 0) ? 'checked' : ''}
                     />
                     <span class="form-checkbox-label">${this.escapeHtml(this.getCalendarName(entityId))}</span>
                   </label>
@@ -8000,7 +8059,7 @@ class SkylightCalendarCard extends HTMLElement {
               <label class="form-label">
                 ${this.t('eventTitle')}<span class="form-required">*</span>
               </label>
-              <input type="text" class="form-input" id="event-title" placeholder="${this.t('eventTitlePlaceholder')}" required />
+              <input type="text" class="form-input" id="event-title" placeholder="${this.t('eventTitlePlaceholder')}" value="${this.escapeHtml(prefill?.summary || '')}" required />
             </div>
           </div>
 
@@ -8010,14 +8069,14 @@ class SkylightCalendarCard extends HTMLElement {
               <div class="form-checkbox-row">
                 <div class="form-group">
                   <div class="form-checkbox-group">
-                    <input type="checkbox" class="form-checkbox" id="event-all-day" />
+                    <input type="checkbox" class="form-checkbox" id="event-all-day" ${isPrefilledAllDay ? 'checked' : ''} />
                     <label class="form-checkbox-label" for="event-all-day">${this.t('allDayEvent')}</label>
                   </div>
                 </div>
 
                 <div class="form-group">
                   <div class="form-checkbox-group">
-                    <input type="checkbox" class="form-checkbox" id="event-recurring" />
+                    <input type="checkbox" class="form-checkbox" id="event-recurring" ${isPrefilledRecurring ? 'checked' : ''} />
                     <label class="form-checkbox-label" for="event-recurring">${this.t('recurring')}</label>
                   </div>
                 </div>
@@ -8025,32 +8084,32 @@ class SkylightCalendarCard extends HTMLElement {
             </div>
           </div>
 
-          <div id="recurring-event-fields" style="display: none;">
+          <div id="recurring-event-fields" style="display: ${isPrefilledRecurring ? 'block' : 'none'};">
             <div class="form-row">
               <div class="form-group form-group-inline">
                 <div class="form-inline-row">
                   <label class="form-label">${this.t('recurrenceFrequency')}</label>
                   <select class="form-select" id="event-recurrence-frequency">
-                  <option value="DAILY">${this.t('recurrenceDaily')}</option>
-                  <option value="WEEKLY">${this.t('recurrenceWeekly')}</option>
-                  <option value="MONTHLY">${this.t('recurrenceMonthly')}</option>
-                  <option value="YEARLY">${this.t('recurrenceYearly')}</option>
+                  <option value="DAILY" ${recurrenceData.frequency === 'DAILY' ? 'selected' : ''}>${this.t('recurrenceDaily')}</option>
+                  <option value="WEEKLY" ${recurrenceData.frequency === 'WEEKLY' ? 'selected' : ''}>${this.t('recurrenceWeekly')}</option>
+                  <option value="MONTHLY" ${recurrenceData.frequency === 'MONTHLY' ? 'selected' : ''}>${this.t('recurrenceMonthly')}</option>
+                  <option value="YEARLY" ${recurrenceData.frequency === 'YEARLY' ? 'selected' : ''}>${this.t('recurrenceYearly')}</option>
                   </select>
                 </div>
               </div>
               <div class="form-group form-group-inline">
                 <div class="form-inline-row">
                   <label class="form-label">${this.t('recurrenceEvery')}</label>
-                  <input type="number" class="form-input" id="event-recurrence-interval" min="1" value="1" />
+                  <input type="number" class="form-input" id="event-recurrence-interval" min="1" value="${this.escapeHtml(recurrenceData.interval || '1')}" />
                 </div>
               </div>
             </div>
-            <div class="form-group" id="event-recurrence-weekdays-group" style="display: none;">
+            <div class="form-group" id="event-recurrence-weekdays-group" style="display: ${isPrefilledRecurring && recurrenceData.frequency === 'WEEKLY' ? 'block' : 'none'};">
               <label class="form-label">${this.t('recurrenceWeekdays')}</label>
               <div class="form-checkbox-group" style="flex-wrap: wrap; gap: 10px;">
                 ${this.getRecurrenceWeekdayOptions().map(day => `
                   <label class="form-checkbox-label" style="display:flex;align-items:center;gap:6px;">
-                    <input type="checkbox" class="form-checkbox event-recurrence-weekday" value="${day.key}" />
+                    <input type="checkbox" class="form-checkbox event-recurrence-weekday" value="${day.key}" ${recurrenceData.byDay.includes(day.key) ? 'checked' : ''} />
                     <span>${day.label}</span>
                   </label>
                 `).join('')}
@@ -8060,32 +8119,32 @@ class SkylightCalendarCard extends HTMLElement {
               <label class="form-label recurrence-ends-label">${this.t('recurrenceEndsOn')}</label>
               <div class="recurrence-end-row">
                 <label class="recurrence-end-option" for="event-recurrence-end-never">
-                  <input type="radio" name="event-recurrence-end-mode" id="event-recurrence-end-never" value="never" checked />
+                  <input type="radio" name="event-recurrence-end-mode" id="event-recurrence-end-never" value="never" ${this.getRecurrenceEndMode(recurrenceData) === 'never' ? 'checked' : ''} />
                   <span>${this.t('recurrenceNever')}</span>
                 </label>
                 <div></div>
               </div>
               <div class="recurrence-end-row">
                 <label class="recurrence-end-option" for="event-recurrence-end-on">
-                  <input type="radio" name="event-recurrence-end-mode" id="event-recurrence-end-on" value="on" />
+                  <input type="radio" name="event-recurrence-end-mode" id="event-recurrence-end-on" value="on" ${this.getRecurrenceEndMode(recurrenceData) === 'on' ? 'checked' : ''} />
                   <span>${this.t('recurrenceOn')}</span>
                 </label>
-                <input type="date" class="form-input" id="event-recurrence-until" disabled />
+                <input type="date" class="form-input" id="event-recurrence-until" value="${this.escapeHtml(recurrenceData.untilDate || '')}" ${this.getRecurrenceEndMode(recurrenceData) === 'on' ? '' : 'disabled'} />
               </div>
               <div class="recurrence-end-row">
                 <label class="recurrence-end-option" for="event-recurrence-end-after">
-                  <input type="radio" name="event-recurrence-end-mode" id="event-recurrence-end-after" value="after" />
+                  <input type="radio" name="event-recurrence-end-mode" id="event-recurrence-end-after" value="after" ${this.getRecurrenceEndMode(recurrenceData) === 'after' ? 'checked' : ''} />
                   <span>${this.t('recurrenceAfter')}</span>
                 </label>
                 <div class="recurrence-after-input">
-                  <input type="number" class="form-input" id="event-recurrence-count" min="1" placeholder="13" disabled />
+                  <input type="number" class="form-input" id="event-recurrence-count" min="1" placeholder="13" value="${this.escapeHtml(recurrenceData.count || '')}" ${this.getRecurrenceEndMode(recurrenceData) === 'after' ? '' : 'disabled'} />
                   <span>${this.t('recurrenceOccurrences')}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div id="timed-event-fields">
+          <div id="timed-event-fields" style="display: ${isPrefilledAllDay ? 'none' : 'block'};">
             <div class="form-group form-group-inline">
               <div class="form-inline-row">
                 <label class="form-label">${this.t('start')}</label>
@@ -8103,7 +8162,7 @@ class SkylightCalendarCard extends HTMLElement {
             </div>
           </div>
 
-          <div id="all-day-event-fields" style="display: none;">
+          <div id="all-day-event-fields" style="display: ${isPrefilledAllDay ? 'block' : 'none'};">
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">${this.t('startDate')}</label>
@@ -8122,13 +8181,13 @@ class SkylightCalendarCard extends HTMLElement {
           <div class="form-group form-group-inline">
             <div class="form-inline-row">
               <label class="form-label">${this.t('location')}</label>
-              <input type="text" class="form-input" id="event-location" placeholder="${this.t('locationPlaceholder')}" />
+              <input type="text" class="form-input" id="event-location" placeholder="${this.t('locationPlaceholder')}" value="${this.escapeHtml(prefill?.location || '')}" />
             </div>
           </div>
 
           <div class="form-group">
             <label class="form-label">${this.t('description')}</label>
-            <textarea class="form-textarea" id="event-description" placeholder="${this.t('descriptionPlaceholder')}"></textarea>
+            <textarea class="form-textarea" id="event-description" placeholder="${this.t('descriptionPlaceholder')}">${this.escapeHtml(prefill?.description || '')}</textarea>
           </div>
 
           <div id="form-error" class="error-message" style="display: none;"></div>
@@ -8997,6 +9056,101 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
 
+  getForwardExistingCalendarIds(event) {
+    const existingCalendarIds = new Set();
+
+    if (event?.entityId) existingCalendarIds.add(event.entityId);
+    if (Array.isArray(event?.sourceEntityIds)) {
+      event.sourceEntityIds.forEach((entityId) => entityId && existingCalendarIds.add(entityId));
+    }
+    if (Array.isArray(event?.sourceEvents)) {
+      event.sourceEvents.forEach((sourceEvent) => sourceEvent?.entityId && existingCalendarIds.add(sourceEvent.entityId));
+    }
+
+    const eventKey = this.getEventExactMatchKey(event);
+    (this._events || []).forEach((candidateEvent) => {
+      if (candidateEvent?.entityId && this.getEventExactMatchKey(candidateEvent) === eventKey) {
+        existingCalendarIds.add(candidateEvent.entityId);
+      }
+    });
+
+    return existingCalendarIds;
+  }
+
+  showForwardEventModal(event, startDate, endDate, isAllDay) {
+    const modal = this.getRootElementById('event-modal');
+    const content = this.getRootElementById('modal-content');
+    const writableCalendars = this.getWritableCalendars();
+    const existingCalendarIds = this.getForwardExistingCalendarIds(event);
+
+    if (writableCalendars.length === 0) {
+      this.showError(this.t('noWritableCalendars'));
+      return;
+    }
+
+    content.innerHTML = `
+      <div class="confirm-dialog">
+        <h3 class="confirm-title">${this.t('forwardEventTitle')}</h3>
+        <p class="confirm-message">${this.t('forwardEventPrompt')}</p>
+
+        <div class="recurring-options forward-calendar-options">
+          ${writableCalendars.map((entityId) => {
+            const alreadyExists = existingCalendarIds.has(entityId);
+            return `
+              <label class="recurring-option ${alreadyExists ? 'disabled-option' : ''}">
+                <input type="checkbox" class="forward-calendar-option" value="${entityId}" ${alreadyExists ? 'checked disabled' : ''} />
+                <div class="recurring-option-label">
+                  <div class="recurring-option-title">${this.escapeHtml(this.getCalendarName(entityId))}</div>
+                  <div class="recurring-option-description">${alreadyExists ? this.t('forwardEventAlreadyExists') : this.escapeHtml(entityId)}</div>
+                </div>
+              </label>
+            `;
+          }).join('')}
+        </div>
+
+        <div id="form-error" class="error-message" style="display: none;"></div>
+
+        <div class="confirm-actions">
+          <button class="btn btn-secondary" id="cancel-forward-event-btn">${this.t('cancel')}</button>
+          <button class="btn btn-primary" id="confirm-forward-event-btn">${this.t('continue')}</button>
+        </div>
+      </div>
+    `;
+
+    modal.classList.add('show');
+
+    this.getRootElementById('cancel-forward-event-btn')?.addEventListener('click', () => {
+      modal.classList.remove('show');
+      this.showEventModal(event);
+    });
+
+    this.getRootElementById('confirm-forward-event-btn')?.addEventListener('click', () => {
+      const selectedCalendarIds = Array.from(this._root.querySelectorAll('.forward-calendar-option:checked'))
+        .map((input) => input.value)
+        .filter((entityId) => writableCalendars.includes(entityId) && !existingCalendarIds.has(entityId));
+      const errorDiv = this.getRootElementById('form-error');
+
+      if (selectedCalendarIds.length === 0) {
+        this.showFormError(errorDiv, this.t('forwardEventNoNewCalendars'));
+        return;
+      }
+
+      modal.classList.remove('show');
+      this.showCreateEventModal(null, null, {
+        selectedCalendarIds,
+        prefill: {
+          summary: event.summary || '',
+          startDate,
+          endDate,
+          isAllDay,
+          location: event.location || '',
+          description: event.description || '',
+          rrule: event.rrule || ''
+        }
+      });
+    });
+  }
+
   showEditConfirmation(event, startDate, endDate, isAllDay, selectedEvents = null) {
     const modal = this.getRootElementById('event-modal');
     const content = this.getRootElementById('modal-content');
@@ -9390,6 +9544,7 @@ class SkylightCalendarCard extends HTMLElement {
     // WebSocket delete works for Google Calendar and other integrations
     const canEdit = canModify;
     const canDelete = canModify; // WebSocket delete works for all calendars including Google
+    const canForward = !!this._config.enable_event_management && this.getWritableCalendars().length > 0;
 
     content.innerHTML = `
       <div class="modal-header">
@@ -9457,12 +9612,13 @@ class SkylightCalendarCard extends HTMLElement {
           </div>
         ` : ''}
 
-        ${(canEdit || canDelete) ? `
+        ${(canEdit || canDelete || canForward) ? `
           <div class="modal-actions">
             <div class="modal-actions-left">
               ${canDelete ? `<button class="btn btn-danger" id="delete-event-btn">${this.t('delete')}</button>` : ''}
             </div>
             <div class="modal-actions-right">
+              ${canForward ? `<button class="btn btn-secondary" id="forward-event-btn">${this.t('forwardEvent')}</button>` : ''}
               ${canEdit ? `<button class="btn btn-primary" id="edit-event-btn">${this.t('editEvent')}</button>` : ''}
             </div>
           </div>
@@ -9493,6 +9649,14 @@ class SkylightCalendarCard extends HTMLElement {
         return;
       }
       this.showEditConfirmation(event, startDate, endDate, isAllDay);
+    });
+
+
+    // Forward button
+    this.getRootElementById('forward-event-btn')?.addEventListener('click', () => {
+      this._activeModalBackHandler = null;
+      modal.classList.remove('show');
+      this.showForwardEventModal(event, startDate, endDate, isAllDay);
     });
 
     // Delete button
