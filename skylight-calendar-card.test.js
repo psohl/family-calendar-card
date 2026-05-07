@@ -309,6 +309,36 @@ test('combine_calendars merges exact duplicates and keeps distinct events', () =
   assert.deepEqual(merged.sourceEntityIds.sort(), ['calendar.a', 'calendar.b']);
 });
 
+
+
+test('HTML attribute escaping protects quoted event prefill values', () => {
+  const card = makeCard({ entities: ['calendar.a'] });
+
+  assert.equal(
+    card.escapeHtmlAttribute("Team \"sync\" & <review> 'plan'"),
+    'Team &quot;sync&quot; &amp; &lt;review&gt; &#39;plan&#39;'
+  );
+});
+
+test('forward event detects calendars that already contain matching event', () => {
+  const card = makeCard({ entities: ['calendar.a', 'calendar.b', 'calendar.c'] });
+  const event = {
+    entityId: 'calendar.a',
+    sourceEntityIds: ['calendar.a'],
+    sourceEvents: [{ entityId: 'calendar.a' }],
+    summary: 'Team sync',
+    location: 'Room A',
+    start: { dateTime: '2026-05-01T10:00:00Z' },
+    end: { dateTime: '2026-05-01T11:00:00Z' }
+  };
+  card._events = [
+    { entityId: 'calendar.b', summary: 'Team sync', location: 'Room A', start: { dateTime: '2026-05-01T10:00:00Z' }, end: { dateTime: '2026-05-01T11:00:00Z' } },
+    { entityId: 'calendar.c', summary: 'Different', location: 'Room A', start: { dateTime: '2026-05-01T10:00:00Z' }, end: { dateTime: '2026-05-01T11:00:00Z' } }
+  ];
+
+  assert.deepEqual([...card.getForwardExistingCalendarIds(event)].sort(), ['calendar.a', 'calendar.b']);
+});
+
 test('event_styles apply rule priority and match logic', () => {
   const card = makeCard({
     entities: ['calendar.a'],
