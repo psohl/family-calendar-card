@@ -4,6 +4,8 @@
 ![Github All Releases](https://img.shields.io/github/downloads/superdingo101/skylight-calendar-card/total.svg)
 [![GitHub issues](https://img.shields.io/github/issues/superdingo101/skylight-calendar-card.svg)](https://github.com/superdingo101/skylight-calendar-card/issues)
 [![License](https://img.shields.io/github/license/superdingo101/skylight-calendar-card.svg)](LICENSE)
+<a><img src="https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-pink?style=for-the-badge&logo=github" alt="GithHub Sponsors" style="height: 20px !important;" ></a>
+<a><img src="https://img.shields.io/badge/Donate-Buy%20me%20a%20beer-yellow?style=for-the-badge&logo=buy-me-a-coffee" alt="Buy Me a Coffee" style="height: 20px !important;" ></a>
 
 # Skylight Calendar Card for Home Assistant
 
@@ -106,6 +108,17 @@ entities:
 
 
 ## 📚 Documentation
+
+Skylight Calendar Card includes a visual configurator for most common options.
+
+Some advanced features are supported by the card but must be configured in YAML.
+
+If you do not see an option in the visual editor, open the card in YAML mode. YAML-only features include:
+
+- `event_styles` — conditionally style individual events
+- `day_styles` — conditionally style days
+- `virtual_calendars` — group multiple calendars into a single virtual calendar
+- Advanced UIX/Card Mod styling
 
 Full documentation is available in the wiki:
 
