@@ -39,6 +39,7 @@ after(() => {
 require('./skylight-calendar-card.js');
 
 const Card = customElements.get('skylight-calendar-card');
+const DaylightCard = customElements.get('daylight-calendar-card');
 const originalCardRender = Card.prototype.render;
 Card.prototype.render = function() {};
 Card.prototype.renderPreservingAgendaScroll = function() {};
@@ -49,6 +50,19 @@ function makeCard(config = { entities: ['calendar.family'] }) {
   card.setConfig(config);
   return card;
 }
+
+
+test('registers daylight custom element while retaining skylight compatibility', () => {
+  assert.equal(DaylightCard, Card);
+  assert.equal(customElements.get('daylight-calendar-card-editor'), customElements.get('skylight-calendar-card-editor'));
+  assert.deepEqual(window.customCards.at(-1), {
+    type: 'daylight-calendar-card',
+    name: 'Daylight Calendar Card',
+    description: 'A bright, family-friendly calendar card for Home Assistant dashboards.',
+    preview: true,
+    documentationURL: 'https://github.com/superdingo101/daylight-calendar-card'
+  });
+});
 
 function recurrenceCases() {
   return [
