@@ -1,15 +1,20 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
-[![GitHub release](https://img.shields.io/github/release/superdingo101/skylight-calendar-card.svg)](https://github.com/superdingo101/skylight-calendar-card/releases)
-[![GitHub stars](https://img.shields.io/github/stars/superdingo101/skylight-calendar-card.svg)](https://github.com/superdingo101/skylight-calendar-card/stargazers)
-![Github All Releases](https://img.shields.io/github/downloads/superdingo101/skylight-calendar-card/total.svg)
-[![GitHub issues](https://img.shields.io/github/issues/superdingo101/skylight-calendar-card.svg)](https://github.com/superdingo101/skylight-calendar-card/issues)
-[![License](https://img.shields.io/github/license/superdingo101/skylight-calendar-card.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/release/superdingo101/daylight-calendar-card.svg)](https://github.com/superdingo101/daylight-calendar-card/releases)
+[![GitHub stars](https://img.shields.io/github/stars/superdingo101/daylight-calendar-card.svg)](https://github.com/superdingo101/daylight-calendar-card/stargazers)
+![Github All Releases](https://img.shields.io/github/downloads/superdingo101/daylight-calendar-card/total.svg)
+[![GitHub issues](https://img.shields.io/github/issues/superdingo101/daylight-calendar-card.svg)](https://github.com/superdingo101/daylight-calendar-card/issues)
+[![License](https://img.shields.io/github/license/superdingo101/daylight-calendar-card.svg)](LICENSE)
 <a><img src="https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-pink?style=for-the-badge&logo=github" alt="GithHub Sponsors" style="height: 20px !important;" ></a>
 <a><img src="https://img.shields.io/badge/Donate-Buy%20me%20a%20beer-yellow?style=for-the-badge&logo=buy-me-a-coffee" alt="Buy Me a Coffee" style="height: 20px !important;" ></a>
 
-# Skylight Calendar Card for Home Assistant
+# Daylight Calendar Card for Home Assistant
 
-A beautiful, family-friendly Lovelace calendar card inspired by the Skylight Calendar display.
+> [!IMPORTANT]
+> **Project renamed:** `skylight-calendar-card` is now `daylight-calendar-card`.
+>
+> Existing dashboard YAML using `type: custom:skylight-calendar-card` continues to work, for now. New naming and configuration examples will transition gradually.
+
+A bright, family-friendly calendar card for Home Assistant dashboards.
 
 Designed for clarity at a glance, with flexible views and deep customization.
 
@@ -56,13 +61,13 @@ Designed for clarity at a glance, with flexible views and deep customization.
 
 ### Recommended: Install via HACS
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=superdingo101&repository=skylight-calendar-card&category=frontend)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=superdingo101&repository=daylight-calendar-card&category=frontend)
 
 OR
 
 1. Open **HACS → Frontend**
 2. Click **+ Explore & Download Repositories**
-3. Search for **Skylight Calendar Card**
+3. Search for **Daylight Calendar Card**
 4. Install and refresh your dashboard
 
 👉 If you don’t have HACS yet, follow: [https://hacs.xyz/docs/use/](https://hacs.xyz/docs/use/)
@@ -76,7 +81,7 @@ OR
 <summary>Without HACS</summary>
 
 1. Download:
-   [https://raw.githubusercontent.com/superdingo101/skylight-calendar-card/refs/heads/main/skylight-calendar-card.js](https://raw.githubusercontent.com/superdingo101/skylight-calendar-card/refs/heads/main/skylight-calendar-card.js)
+   [https://raw.githubusercontent.com/superdingo101/daylight-calendar-card/refs/heads/main/skylight-calendar-card.js](https://raw.githubusercontent.com/superdingo101/daylight-calendar-card/refs/heads/main/skylight-calendar-card.js)
 2. Place in:
    `<config>/www/skylight-calendar-card.js`
 3. Add resource:
@@ -96,7 +101,7 @@ OR
 ## ⚡ Quick Start
 
 ```yaml
-type: custom:skylight-calendar-card
+type: custom:daylight-calendar-card
 title: Family Calendar
 entities:
   - calendar.family
@@ -109,7 +114,7 @@ entities:
 
 ## 📚 Documentation
 
-Skylight Calendar Card includes a visual configurator for most common options.
+Daylight Calendar Card includes a visual configurator for most common options.
 
 Some advanced features are supported by the card but must be configured in YAML.
 
@@ -131,7 +136,7 @@ Full documentation is available in the wiki:
 * Development
 
 <p align="center">
-  <a href="https://github.com/superdingo101/skylight-calendar-card/wiki">
+  <a href="https://github.com/superdingo101/daylight-calendar-card/wiki">
     <img src="https://img.shields.io/badge/Docs-Read%20the%20Wiki-blue?logo=github&style=for-the-badge" />
   </a>
 </p>
@@ -141,7 +146,7 @@ Full documentation is available in the wiki:
 ## 💡 Tips
 
 * Use multiple calendars for a shared family dashboard
-* Pair with wall-mounted tablets for a Skylight-style experience
+* Pair with wall-mounted tablets for a Daylight-style experience
 * Combine with UIX/Card Mod for advanced styling
 
 ---
@@ -164,10 +169,10 @@ Still stuck? Open an issue below
 If you need help, have ideas, or want to contribute, use the options below:
 
 <p align="center">
-  <a href="https://github.com/superdingo101/skylight-calendar-card/issues">
+  <a href="https://github.com/superdingo101/daylight-calendar-card/issues">
     <img src="https://img.shields.io/badge/GitHub-Issues-green?logo=github&style=for-the-badge" />
   </a>
-  <a href="https://github.com/superdingo101/skylight-calendar-card/discussions">
+  <a href="https://github.com/superdingo101/daylight-calendar-card/discussions">
     <img src="https://img.shields.io/badge/GitHub-Discussions-lightgrey?logo=github&style=for-the-badge" />
   </a>
   <a href="https://community.home-assistant.io/t/skylight-calendar-card-a-family-friendly-schedule-card/981221/17">

@@ -2973,6 +2973,7 @@ class SkylightCalendarCard extends HTMLElement {
   getStyles() {
     return `
       :host,
+      daylight-calendar-card,
       skylight-calendar-card {
         display: block;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -10355,7 +10356,7 @@ class SkylightCalendarCard extends HTMLElement {
   }
 
   static async getConfigElement() {
-    return document.createElement('skylight-calendar-card-editor');
+    return document.createElement('daylight-calendar-card-editor');
   }
 }
 
@@ -12020,14 +12021,19 @@ class SkylightCalendarCardEditor extends HTMLElement {
   }
 }
 
-customElements.define('skylight-calendar-card', SkylightCalendarCard);
-customElements.define('skylight-calendar-card-editor', SkylightCalendarCardEditor);
+class LegacySkylightCalendarCard extends SkylightCalendarCard {}
+class LegacySkylightCalendarCardEditor extends SkylightCalendarCardEditor {}
+
+customElements.define('daylight-calendar-card', SkylightCalendarCard);
+customElements.define('daylight-calendar-card-editor', SkylightCalendarCardEditor);
+customElements.define('skylight-calendar-card', LegacySkylightCalendarCard);
+customElements.define('skylight-calendar-card-editor', LegacySkylightCalendarCardEditor);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: 'skylight-calendar-card',
-  name: 'Skylight Calendar Card',
-  description: 'A beautiful calendar card inspired by Skylight Calendar',
+  type: 'daylight-calendar-card',
+  name: 'Daylight Calendar Card',
+  description: 'A bright, family-friendly calendar card for Home Assistant dashboards.',
   preview: true,
-  documentationURL: 'https://github.com/superdingo101/skylight-calendar-card'
+  documentationURL: 'https://github.com/superdingo101/daylight-calendar-card'
 });
