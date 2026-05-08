@@ -12021,10 +12021,13 @@ class SkylightCalendarCardEditor extends HTMLElement {
   }
 }
 
+class LegacySkylightCalendarCard extends SkylightCalendarCard {}
+class LegacySkylightCalendarCardEditor extends SkylightCalendarCardEditor {}
+
 customElements.define('daylight-calendar-card', SkylightCalendarCard);
 customElements.define('daylight-calendar-card-editor', SkylightCalendarCardEditor);
-customElements.define('skylight-calendar-card', SkylightCalendarCard);
-customElements.define('skylight-calendar-card-editor', SkylightCalendarCardEditor);
+customElements.define('skylight-calendar-card', LegacySkylightCalendarCard);
+customElements.define('skylight-calendar-card-editor', LegacySkylightCalendarCardEditor);
 
 window.customCards = window.customCards || [];
 window.customCards.push({

@@ -14,7 +14,12 @@ class HTMLElementMock {
 global.HTMLElement = HTMLElementMock;
 global.customElements = {
   registry: new Map(),
-  define(name, ctor) { this.registry.set(name, ctor); },
+  define(name, ctor) {
+    if (this.registry.has(name) || Array.from(this.registry.values()).includes(ctor)) {
+      throw new DOMException('This name or constructor has already been registered in the registry.', 'NotSupportedError');
+    }
+    this.registry.set(name, ctor);
+  },
   get(name) { return this.registry.get(name); }
 };
 global.window = { localStorage: { getItem: () => null, setItem: () => {} }, getComputedStyle: () => ({ color: 'rgb(0, 0, 0)' }) };
@@ -25,6 +30,12 @@ global.CustomEvent = class CustomEvent {
     this.detail = init.detail;
     this.bubbles = !!init.bubbles;
     this.composed = !!init.composed;
+  }
+};
+global.DOMException = global.DOMException || class DOMException extends Error {
+  constructor(message, name) {
+    super(message);
+    this.name = name;
   }
 };
 
@@ -53,8 +64,12 @@ function makeCard(config = { entities: ['calendar.family'] }) {
 
 
 test('registers daylight custom element while retaining skylight compatibility', () => {
-  assert.equal(DaylightCard, Card);
-  assert.equal(customElements.get('daylight-calendar-card-editor'), customElements.get('skylight-calendar-card-editor'));
+  assert.notEqual(DaylightCard, Card);
+  assert.equal(Card.prototype instanceof DaylightCard, true);
+  const DaylightEditor = customElements.get('daylight-calendar-card-editor');
+  const LegacyEditor = customElements.get('skylight-calendar-card-editor');
+  assert.notEqual(DaylightEditor, LegacyEditor);
+  assert.equal(LegacyEditor.prototype instanceof DaylightEditor, true);
   assert.deepEqual(window.customCards.at(-1), {
     type: 'daylight-calendar-card',
     name: 'Daylight Calendar Card',
