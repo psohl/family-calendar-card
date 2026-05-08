@@ -323,6 +323,43 @@ test('editor renders key controls and updates config on change', () => {
 });
 
 
+test('editor color picker Set updates scalar and calendar color config', () => {
+  const Editor = customElements.get('skylight-calendar-card-editor');
+  const editor = new Editor();
+  editor._hass = { states: { 'calendar.family': { entity_id: 'calendar.family', attributes: { friendly_name: 'Family' } } } };
+  editor.setConfig({
+    entities: ['calendar.family'],
+    header_color: '#111111',
+    header_text_color: '#222222',
+    event_neutral_background: '#333333',
+    colors: { 'calendar.family': '#444444' },
+    event_font_colors: { 'calendar.family': '#555555' }
+  });
+
+  const emittedConfigs = [];
+  editor.dispatchEvent = (event) => {
+    emittedConfigs.push(event.detail.config);
+    return true;
+  };
+
+  for (const field of ['header_color', 'header_text_color', 'event_neutral_background']) {
+    editor._colorPickerState = { field, mapKey: null };
+    assert.doesNotThrow(() => editor.applyColorPickerColor('#ABCDEF'));
+    assert.equal(editor._config[field], '#ABCDEF');
+    assert.equal(emittedConfigs.at(-1)[field], '#ABCDEF');
+  }
+
+  editor._colorPickerState = { field: 'colors', mapKey: 'calendar.family' };
+  assert.doesNotThrow(() => editor.applyColorPickerColor('#123456'));
+  assert.equal(editor._config.colors['calendar.family'], '#123456');
+  assert.equal(emittedConfigs.at(-1).colors['calendar.family'], '#123456');
+
+  editor._colorPickerState = { field: 'event_font_colors', mapKey: 'calendar.family' };
+  assert.doesNotThrow(() => editor.applyColorPickerColor('#654321'));
+  assert.equal(editor._config.event_font_colors['calendar.family'], '#654321');
+  assert.equal(emittedConfigs.at(-1).event_font_colors['calendar.family'], '#654321');
+  assert.equal(emittedConfigs.length, 5);
+});
 
 test('combine_calendars merges exact duplicates and keeps distinct events', () => {
   const card = makeCard({ entities: ['calendar.a', 'calendar.b'], combine_calendars: true });

@@ -10642,9 +10642,6 @@ class SkylightCalendarCardEditor extends HTMLElement {
 
   emitConfigChanged(nextConfig) {
     this._config = nextConfig;
-    if (field === 'event_color_mode') {
-      this.render();
-    }
     this.dispatchEvent(
       new CustomEvent('config-changed', {
         detail: { config: nextConfig },
