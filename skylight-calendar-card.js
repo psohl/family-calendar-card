@@ -7648,6 +7648,23 @@ class SkylightCalendarCard extends HTMLElement {
       });
     });
 
+    // Day row click handlers (agenda view)
+    this._root.querySelectorAll('.agenda-day-row').forEach(rowEl => {
+      rowEl.addEventListener('click', (e) => {
+        // Don't open if clicking on an event
+        if (e.target.classList.contains('agenda-event') || e.target.closest('.agenda-event')) {
+          return;
+        }
+
+        if (!this._config.enable_event_management || this.getWritableCalendars().length === 0) {
+          return;
+        }
+
+        const date = new Date(rowEl.getAttribute('data-date'));
+        this.showCreateEventModal(date);
+      });
+    });
+
     // Time slot click handlers (schedule view)
     this._root.querySelectorAll('.day-time-slot').forEach(slotEl => {
       slotEl.addEventListener('click', (e) => {
@@ -8470,7 +8487,7 @@ class SkylightCalendarCard extends HTMLElement {
 
         // Refresh events
         this._lastFetch = null;
-        await this.updateEvents();
+        await this.updateEvents({ preserveScroll: this._viewMode === 'agenda' });
       } catch (error) {
         console.error('Failed to create event:', error);
         this.showFormError(errorDiv, error.message || this.t('failedCreateEvent'));
@@ -8862,7 +8879,7 @@ class SkylightCalendarCard extends HTMLElement {
 
         // Refresh events
         this._lastFetch = null;
-        await this.updateEvents();
+        await this.updateEvents({ preserveScroll: this._viewMode === 'agenda' });
       } catch (error) {
         console.error('Failed to update event:', error);
 
@@ -8874,7 +8891,7 @@ class SkylightCalendarCard extends HTMLElement {
             await this.deleteEvent(event.entityId, event.uid, event.recurrence_id);
             modal.classList.remove('show');
             this._lastFetch = null;
-            await this.updateEvents();
+            await this.updateEvents({ preserveScroll: this._viewMode === 'agenda' });
             return;
           } catch (fallbackError) {
             console.error('Safety-net create+delete fallback failed:', fallbackError);
@@ -9560,7 +9577,7 @@ class SkylightCalendarCard extends HTMLElement {
 
         // Refresh events
         this._lastFetch = null;
-        await this.updateEvents();
+        await this.updateEvents({ preserveScroll: this._viewMode === 'agenda' });
       } catch (error) {
         console.error('Failed to delete event:', error);
         this._combinedDeleteTargets = null;
