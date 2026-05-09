@@ -1241,7 +1241,10 @@ class SkylightCalendarCard extends HTMLElement {
       hide_year: config.hide_year || false, // Hide year in header period label
       hide_calendars: config.hide_calendars || false, // Hide calendar badges from header area
       hide_calendar_names: config.hide_calendar_names || false, // Header calendar badges: show icons only
-      hide_controls: config.hide_controls || false, // Hide header controls (add/view/theme/navigation)
+      hide_controls: config.hide_controls || false, // Hide all header controls (add/view/theme/navigation)
+      hide_navigation_buttons: config.hide_navigation_buttons || false, // Hide previous/next/today header navigation buttons
+      hide_add_event_button: config.hide_add_event_button || false, // Hide add event button from header controls
+      hide_view_selector: config.hide_view_selector || false, // Hide view drop-down selector from header controls
       hide_dark_mode_toggle: config.hide_dark_mode_toggle || false, // Hide dark mode toggle from header controls
       show_dashboard_nav_button: config.show_dashboard_nav_button || false, // Show square dashboard navigation button at header left
       header_dashboard_path: this.normalizeDashboardPath(config.header_dashboard_path), // Dashboard path for optional header navigation button
@@ -5488,7 +5491,7 @@ class SkylightCalendarCard extends HTMLElement {
 
   renderStandardHeader() {
     const writableCalendars = this.getWritableCalendars();
-    const canAddEvents = this._config.enable_event_management && writableCalendars.length > 0;
+    const canAddEvents = this._config.enable_event_management && writableCalendars.length > 0 && !this._config.hide_add_event_button;
     const shouldShowControls = !this._config.hide_controls;
 
     return `
@@ -5502,10 +5505,10 @@ class SkylightCalendarCard extends HTMLElement {
             ${canAddEvents ? `<button class="add-event-button" id="add-event-btn"><span class="icon">+</span>${this.t('addEvent')}</button>` : ''}
             ${this.renderThemeToggle()}
             <div class="period-controls">
-              <button class="nav-button" id="prev-period" ${this.shouldDisablePreviousNavigation() ? 'disabled' : ''}>‹</button>
+              ${this.renderPeriodNavigationButtons('previous')}
               <div class="month-year">${this.getPeriodLabel()}</div>
-              <button class="nav-button" id="next-period">›</button>
-              <button class="today-button" id="today">${this.t('today')}</button>
+              ${this.renderPeriodNavigationButtons('next')}
+              ${this.renderPeriodNavigationButtons('today')}
             </div>
             ${this.renderViewModeButtons()}
           </div>
@@ -5516,7 +5519,7 @@ class SkylightCalendarCard extends HTMLElement {
 
   renderCompactHeader() {
     const writableCalendars = this.getWritableCalendars();
-    const canAddEvents = this._config.enable_event_management && writableCalendars.length > 0;
+    const canAddEvents = this._config.enable_event_management && writableCalendars.length > 0 && !this._config.hide_add_event_button;
     const shouldShowCalendars = !this._config.hide_calendars;
     const shouldShowControls = !this._config.hide_controls;
 
@@ -5530,10 +5533,10 @@ class SkylightCalendarCard extends HTMLElement {
         ${shouldShowControls ? `
           <div class="header-controls compact-header-controls">
             <div class="compact-period-controls">
-              <button class="nav-button" id="prev-period" ${this.shouldDisablePreviousNavigation() ? 'disabled' : ''}>‹</button>
+              ${this.renderPeriodNavigationButtons('previous')}
               <div class="month-year">${this.getPeriodLabel()}</div>
-              <button class="nav-button" id="next-period">›</button>
-              <button class="today-button" id="today">${this.t('today')}</button>
+              ${this.renderPeriodNavigationButtons('next')}
+              ${this.renderPeriodNavigationButtons('today')}
             </div>
             ${canAddEvents ? `<button class="compact-add-event-button" id="add-event-btn" aria-label="${this.t('addEvent')}" title="${this.t('addEvent')}">+</button>` : ''}
             ${this.renderThemeToggle()}
@@ -5586,7 +5589,27 @@ class SkylightCalendarCard extends HTMLElement {
     return `<button class="dashboard-nav-button" id="header-dashboard-btn" aria-label="${this.t('openDashboard')}" title="${this.t('openDashboard')}">⌂</button>`;
   }
 
+  renderPeriodNavigationButtons(buttonType) {
+    if (this._config.hide_navigation_buttons) return '';
+
+    if (buttonType === 'previous') {
+      return `<button class="nav-button" id="prev-period" ${this.shouldDisablePreviousNavigation() ? 'disabled' : ''}>‹</button>`;
+    }
+
+    if (buttonType === 'next') {
+      return '<button class="nav-button" id="next-period">›</button>';
+    }
+
+    if (buttonType === 'today') {
+      return `<button class="today-button" id="today">${this.t('today')}</button>`;
+    }
+
+    return '';
+  }
+
   renderViewModeButtons() {
+    if (this._config.hide_view_selector) return '';
+
     return `
       <div class="view-mode-buttons">
         <select class="view-mode-select" id="view-mode-select" aria-label="Select calendar view">
@@ -10349,6 +10372,9 @@ class SkylightCalendarCard extends HTMLElement {
       hide_calendars: false,
       hide_year: false,
       hide_controls: false,
+      hide_navigation_buttons: false,
+      hide_add_event_button: false,
+      hide_view_selector: false,
       hide_dark_mode_toggle: false,
       show_dashboard_nav_button: false,
       header_dashboard_path: null,
@@ -11013,7 +11039,10 @@ class SkylightCalendarCardEditor extends HTMLElement {
         <label><input type="checkbox" data-field="hide_year" ${this._config.hide_year ? 'checked' : ''}> Hide year in header period label</label>
         <label><input type="checkbox" data-field="hide_calendars" ${this._config.hide_calendars ? 'checked' : ''}> Hide calendar badges</label>
         <label><input type="checkbox" data-field="hide_calendar_names" ${this._config.hide_calendar_names ? 'checked' : ''}> Header badges: hide calendar names</label>
-        <label><input type="checkbox" data-field="hide_controls" ${this._config.hide_controls ? 'checked' : ''}> Hide header controls</label>
+        <label><input type="checkbox" data-field="hide_controls" ${this._config.hide_controls ? 'checked' : ''}> Hide all header controls</label>
+        <label><input type="checkbox" data-field="hide_navigation_buttons" ${this._config.hide_navigation_buttons ? 'checked' : ''}> Hide previous/next and today buttons</label>
+        <label><input type="checkbox" data-field="hide_add_event_button" ${this._config.hide_add_event_button ? 'checked' : ''}> Hide add event button</label>
+        <label><input type="checkbox" data-field="hide_view_selector" ${this._config.hide_view_selector ? 'checked' : ''}> Hide view selector</label>
         <label><input type="checkbox" data-field="show_dashboard_nav_button" ${this._config.show_dashboard_nav_button ? 'checked' : ''}> Show left dashboard navigation button</label>
       </div>
       ${this._config.show_dashboard_nav_button ? `
