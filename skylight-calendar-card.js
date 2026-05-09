@@ -2163,7 +2163,7 @@ class SkylightCalendarCard extends HTMLElement {
         const configuredEntities = virtualCalendar.entities.filter((configuredEntityId) => this._config.entities.includes(configuredEntityId));
         const hasVisibleEntity = configuredEntities.some((configuredEntityId) => !hiddenBadgeCalendars.has(configuredEntityId));
         if (hasVisibleEntity) {
-          const color = virtualCalendar.color || this.normalizeSingleColor(this._config.colors[entityId] || this.getDefaultColor(originalIndex));
+          const color = virtualCalendar.color || this.getCalendarColor(entityId, originalIndex);
           const isHidden = configuredEntities.every((configuredEntityId) => this._hiddenCalendars.has(configuredEntityId));
           items.push({
             id: virtualCalendar.id,
@@ -2181,7 +2181,7 @@ class SkylightCalendarCard extends HTMLElement {
       }
 
       if (virtualCalendar || hiddenBadgeCalendars.has(entityId)) return;
-      const color = this.normalizeSingleColor(this._config.colors[entityId] || this.getDefaultColor(originalIndex));
+      const color = this.getCalendarColor(entityId, originalIndex);
       items.push({
         id: entityId,
         entityId,
@@ -2227,9 +2227,16 @@ class SkylightCalendarCard extends HTMLElement {
     }, {});
   }
 
+  getCalendarColor(entityId, index = 0) {
+    return this.normalizeSingleColor(
+      this._config?.colors?.[entityId] ||
+      this.getDefaultColor(index)
+    );
+  }
+
   async fetchEventsForCalendar(entityId, colorIndex, chunks) {
     const seen = new Set();
-    const color = this.normalizeSingleColor(this._config.colors[entityId] || this.getDefaultColor(colorIndex));
+    const color = this.getCalendarColor(entityId, colorIndex);
 
     const chunkEventLists = await Promise.all(
       chunks.map(chunk => this.fetchEventsForChunk(entityId, chunk))
@@ -10553,6 +10560,44 @@ class SkylightCalendarCardEditor extends HTMLElement {
     return this._hass?.states?.[entityId]?.attributes?.friendly_name || entityId;
   }
 
+  getConfiguredEntityIndex(entityId) {
+    return this.getConfiguredEntitiesForEditor().indexOf(entityId);
+  }
+
+  getEditorCalendarColor(entityId) {
+    const entityIndex = this.getConfiguredEntityIndex(entityId);
+    return this.normalizeHexColor(this.getMapFieldValue('colors')[entityId]) ||
+      SkylightCalendarCard.prototype.getDefaultColor(Math.max(entityIndex, 0));
+  }
+
+  getContrastingEditorColor(backgroundColor) {
+    const hex = this.normalizeHexColor(backgroundColor);
+    if (!hex) return '#FFFFFF';
+
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.6 ? '#000000' : '#FFFFFF';
+  }
+
+  getEditorEventFontColor(entityId) {
+    return this.normalizeHexColor(this.getMapFieldValue('event_font_colors')[entityId]) ||
+      this.getContrastingEditorColor(this.getEditorCalendarColor(entityId));
+  }
+
+  getEditorMapColorValue(field, entityId) {
+    if (field === 'colors') {
+      return this.getEditorCalendarColor(entityId);
+    }
+
+    if (field === 'event_font_colors') {
+      return this.getEditorEventFontColor(entityId);
+    }
+
+    return this.toColorInputValue(this.getMapFieldValue(field)[entityId]);
+  }
+
   getDashboardOptionsForEditor() {
     const panels = this._hass?.panels || {};
     const dashboards = Object.values(panels)
@@ -10635,7 +10680,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
 
   getColorValue(field, mapKey = null) {
     if (mapKey) {
-      return this.toColorInputValue(this.getMapFieldValue(field)[mapKey]);
+      return this.getEditorMapColorValue(field, mapKey);
     }
     return this.toColorInputValue(this._config[field]);
   }
@@ -10806,7 +10851,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
     return entities
       .map((entityId) => {
         const displayName = this.escapeHtml(this.getEntityFriendlyName(entityId));
-        const value = mapValue[entityId] || '';
+        const value = inputType === 'color' ? this.getEditorMapColorValue(mapKey, entityId) : (mapValue[entityId] || '');
         if (inputType === 'color') {
           return `
             <div class="map-row">

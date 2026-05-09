@@ -678,3 +678,37 @@ for (const calendarType of [
     });
   }
 }
+
+test('calendar colors prefer configured values before default palette', () => {
+  const card = makeCard({
+    entities: ['calendar.family', 'calendar.work'],
+    colors: { 'calendar.family': '#112233' }
+  });
+
+  assert.equal(card.getCalendarColor('calendar.family', 0), '#112233');
+  assert.equal(card.getCalendarColor('calendar.work', 1), '#4ECDC4');
+});
+
+test('editor color swatches show effective calendar and event font colors', () => {
+  const Editor = customElements.get('daylight-calendar-card-editor');
+  const editor = new Editor();
+  editor._config = {
+    entities: ['calendar.family', 'calendar.work', 'calendar.school'],
+    colors: { 'calendar.school': '#ABCDEF' },
+    event_font_colors: { 'calendar.school': '#123456' }
+  };
+  editor._hass = {
+    states: {
+      'calendar.family': { attributes: { friendly_name: 'Family' } },
+      'calendar.work': { attributes: { friendly_name: 'Work' } },
+      'calendar.school': { attributes: { friendly_name: 'School' } }
+    }
+  };
+
+  assert.equal(editor.getColorValue('colors', 'calendar.family'), '#FF6B6B');
+  assert.equal(editor.getColorValue('colors', 'calendar.work'), '#4ECDC4');
+  assert.equal(editor.getColorValue('colors', 'calendar.school'), '#ABCDEF');
+  assert.equal(editor.getColorValue('event_font_colors', 'calendar.family'), '#FFFFFF');
+  assert.equal(editor.getColorValue('event_font_colors', 'calendar.work'), '#000000');
+  assert.equal(editor.getColorValue('event_font_colors', 'calendar.school'), '#123456');
+});
