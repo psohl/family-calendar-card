@@ -98,6 +98,7 @@ test('getStubConfig includes key configuration defaults', () => {
     'event_calendar_friendly_name', 'event_title_prefix', 'event_color_mode',
     'event_neutral_background', 'event_tint_opacity', 'event_color_bar_width', 'combine_style',
     'combine_background', 'hide_calendars', 'hide_year', 'hide_controls',
+    'hide_navigation_buttons', 'hide_add_event_button', 'hide_view_selector',
     'hide_dark_mode_toggle', 'show_dashboard_nav_button', 'header_dashboard_path',
     'header_weather_sensor', 'color_scheme', 'enable_event_management'
   ];
@@ -115,6 +116,9 @@ test('setConfig applies visual layout and styling options', () => {
     hide_calendars: true,
     hide_calendar_names: true,
     hide_controls: true,
+    hide_navigation_buttons: true,
+    hide_add_event_button: true,
+    hide_view_selector: true,
     hide_dark_mode_toggle: true,
     show_dashboard_nav_button: true,
     header_dashboard_path: 'lovelace-mobile',
@@ -161,6 +165,9 @@ test('setConfig applies visual layout and styling options', () => {
   assert.equal(card._config.hide_calendars, true);
   assert.equal(card._config.hide_calendar_names, true);
   assert.equal(card._config.hide_controls, true);
+  assert.equal(card._config.hide_navigation_buttons, true);
+  assert.equal(card._config.hide_add_event_button, true);
+  assert.equal(card._config.hide_view_selector, true);
   assert.equal(card._config.hide_dark_mode_toggle, true);
   assert.equal(card._config.show_dashboard_nav_button, true);
   assert.equal(card._config.header_dashboard_path, '/lovelace-mobile');
@@ -273,6 +280,48 @@ test('calendar render includes header controls and modal container', () => {
   assert.match(html, /id="next-period"/);
   assert.match(html, /id="today"/);
   assert.match(html, /id="event-modal"/);
+});
+
+test('hide_navigation_buttons hides previous, next, and today controls only', () => {
+  const card = new Card();
+  card._hass = { states: {}, locale: { language: 'en' }, language: 'en', themes: { darkMode: false } };
+  card.setConfig({ entities: ['calendar.family'], hide_navigation_buttons: true });
+
+  originalCardRender.call(card);
+  const html = card._root.innerHTML;
+
+  assert.doesNotMatch(html, /id="prev-period"/);
+  assert.doesNotMatch(html, /id="next-period"/);
+  assert.doesNotMatch(html, /id="today"/);
+  assert.match(html, /class="month-year"/);
+  assert.match(html, /id="view-mode-select"/);
+});
+
+test('hide_add_event_button hides add event control only', () => {
+  const card = new Card();
+  card._hass = { states: {}, locale: { language: 'en' }, language: 'en', themes: { darkMode: false } };
+  card.setConfig({ entities: ['calendar.family'], enable_event_management: true, hide_add_event_button: true });
+  card._calendarCapabilities = { 'calendar.family': { canCreate: true, isReadonly: false } };
+
+  originalCardRender.call(card);
+  const html = card._root.innerHTML;
+
+  assert.doesNotMatch(html, /id="add-event-btn"/);
+  assert.match(html, /id="prev-period"/);
+  assert.match(html, /id="view-mode-select"/);
+});
+
+test('hide_view_selector hides view drop-down selector only', () => {
+  const card = new Card();
+  card._hass = { states: {}, locale: { language: 'en' }, language: 'en', themes: { darkMode: false } };
+  card.setConfig({ entities: ['calendar.family'], hide_view_selector: true });
+
+  originalCardRender.call(card);
+  const html = card._root.innerHTML;
+
+  assert.doesNotMatch(html, /id="view-mode-select"/);
+  assert.match(html, /id="prev-period"/);
+  assert.match(html, /id="today"/);
 });
 
 test('header button listeners invoke expected actions', () => {
