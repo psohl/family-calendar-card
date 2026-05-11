@@ -1,4 +1,4 @@
-ach// ============================================================================
+// ============================================================================
 // TRANSLATIONS
 // ============================================================================
 // To add a new language:
@@ -1099,6 +1099,15 @@ class SkylightCalendarCard extends HTMLElement {
       header_weather_sensor: typeof config.header_weather_sensor === 'string' && config.header_weather_sensor.trim()
         ? config.header_weather_sensor.trim()
         : null, // Optional weather/sensor entity that provides current conditions + forecast
+      header_automation_entity: typeof config.header_automation_entity === 'string' && config.header_automation_entity.trim()
+        ? config.header_automation_entity.trim()
+        : '', // Optional Home Assistant automation entity to trigger when header automation button is clicked
+      header_automation_icon: typeof config.header_automation_icon === 'string' && config.header_automation_icon.trim()
+        ? config.header_automation_icon.trim()
+        : '', // Icon for the header automation button (mdi:* or plain text/emoji); falls back to default if empty
+      header_automation_label: typeof config.header_automation_label === 'string'
+        ? config.header_automation_label
+        : '', // Tooltip / aria-label for the header automation button; falls back to automation's friendly name if empty
       hide_event_calendar_bubble: config.hide_event_calendar_bubble || false, // Hide calendar initial bubble on events
       show_event_location: config.show_event_location || false, // Show event location in week and schedule views
       use_short_location: config.use_short_location || false, // Shorten event location text in month/week/schedule/agenda views
@@ -1152,6 +1161,15 @@ class SkylightCalendarCard extends HTMLElement {
       header_weather_sensor: typeof config.header_weather_sensor === 'string' && config.header_weather_sensor.trim()
         ? config.header_weather_sensor.trim()
         : null,
+      header_automation_entity: typeof config.header_automation_entity === 'string' && config.header_automation_entity.trim()
+        ? config.header_automation_entity.trim()
+        : '',
+      header_automation_icon: typeof config.header_automation_icon === 'string' && config.header_automation_icon.trim()
+        ? config.header_automation_icon.trim()
+        : '',
+      header_automation_label: typeof config.header_automation_label === 'string'
+        ? config.header_automation_label
+        : '',
       agenda_compact_events: config.agenda_compact_events ?? false,
       event_styles: normalizedEventStyles,
       day_styles: normalizedDayStyles,
@@ -3173,6 +3191,56 @@ class SkylightCalendarCard extends HTMLElement {
       .dashboard-nav-button:hover {
         background: var(--header-control-bg-hover, rgba(255, 255, 255, 0.3));
         border-color: var(--header-control-border-hover, rgba(255, 255, 255, 0.6));
+      }
+
+      .header-automation-button {
+        background: var(--header-control-bg, rgba(255, 255, 255, 0.2));
+        border: 1px solid var(--header-control-border, rgba(255, 255, 255, 0.4));
+        color: inherit;
+        min-width: 36px;
+        height: 36px;
+        padding: 0 10px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: background 0.2s, border-color 0.2s, transform 0.1s;
+        line-height: 1;
+      }
+
+      .header-automation-button:hover {
+        background: var(--header-control-bg-hover, rgba(255, 255, 255, 0.3));
+        border-color: var(--header-control-border-hover, rgba(255, 255, 255, 0.6));
+      }
+
+      .header-automation-button:active {
+        transform: scale(0.96);
+      }
+
+      .header-automation-button ha-icon {
+        --mdc-icon-size: 18px;
+        display: inline-flex;
+      }
+
+      .header-automation-button.is-running {
+        opacity: 0.75;
+        cursor: progress;
+      }
+
+      .header-automation-wrapper {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .header-automation-last-run {
+        font-size: 11px;
+        opacity: 0.75;
+        white-space: nowrap;
+        line-height: 1;
       }
 
       .nav-button:hover {
@@ -5336,6 +5404,7 @@ class SkylightCalendarCard extends HTMLElement {
               <button class="today-button" id="today">${this.t('today')}</button>
             </div>
             ${this.renderViewModeButtons()}
+            ${this.renderHeaderAutomationButton()}
           </div>
         ` : ''}
       </div>
@@ -5366,6 +5435,7 @@ class SkylightCalendarCard extends HTMLElement {
             ${canAddEvents ? `<button class="compact-add-event-button" id="add-event-btn" aria-label="${this.t('addEvent')}" title="${this.t('addEvent')}">+</button>` : ''}
             ${this.renderThemeToggle()}
             ${this.renderViewModeButtons()}
+            ${this.renderHeaderAutomationButton()}
           </div>
         ` : ''}
       </div>
@@ -5412,6 +5482,108 @@ class SkylightCalendarCard extends HTMLElement {
   renderDashboardNavButton() {
     if (!this.shouldShowDashboardNavButton()) return '';
     return `<button class="dashboard-nav-button" id="header-dashboard-btn" aria-label="${this.t('openDashboard')}" title="${this.t('openDashboard')}">⌂</button>`;
+  }
+
+  renderHeaderAutomationButton() {
+    try {
+      const entity = this._config && this._config.header_automation_entity;
+      if (!entity || typeof entity !== 'string') return '';
+
+      const stateObj = (this._hass && this._hass.states) ? this._hass.states[entity] : null;
+      const iconRaw = ((this._config.header_automation_icon || '') + '').trim() || '▶';
+      const friendlyName = stateObj && stateObj.attributes && stateObj.attributes.friendly_name;
+      const labelRaw = ((this._config.header_automation_label || '') + '').trim();
+      const label = labelRaw || friendlyName || 'Run automation';
+
+      const iconHtml = iconRaw.startsWith('mdi:')
+        ? `<ha-icon icon="${this.escapeHtml(iconRaw)}"></ha-icon>`
+        : this.escapeHtml(iconRaw);
+
+      const lastRunHtml = this.renderHeaderAutomationLastRun(stateObj);
+
+      return `<div class="header-automation-wrapper"><button class="header-automation-button" id="header-automation-btn" aria-label="${this.escapeHtml(label)}" title="${this.escapeHtml(label)}">${iconHtml}</button>${lastRunHtml}</div>`;
+    } catch (error) {
+      console.error('Skylight Calendar Card: failed to render header automation button', error);
+      return '';
+    }
+  }
+
+  renderHeaderAutomationLastRun(stateObj) {
+    try {
+      const lastTriggered = stateObj && stateObj.attributes && stateObj.attributes.last_triggered;
+      const formatted = this.formatHeaderAutomationLastRun(lastTriggered);
+      if (!formatted || !formatted.text) return '';
+      const titleAttr = formatted.title ? ` title="${this.escapeHtml(formatted.title)}"` : '';
+      return `<span class="header-automation-last-run"${titleAttr}>${this.escapeHtml(formatted.text)}</span>`;
+    } catch (error) {
+      console.error('Skylight Calendar Card: failed to render last-run label', error);
+      return '';
+    }
+  }
+
+  formatHeaderAutomationLastRun(lastTriggered) {
+    let language = 'en';
+    try { language = this.getLanguage() || 'en'; } catch (_e) { language = 'en'; }
+
+    if (!lastTriggered) {
+      // Localized fallback when the automation has never run
+      const neverMap = {
+        en: 'Never run',
+        nl: 'Nog niet gedraaid',
+        de: 'Noch nie gelaufen',
+        fr: 'Jamais exécuté',
+        es: 'Nunca ejecutado',
+        ca: 'Mai executat'
+      };
+      return { text: neverMap[language] || neverMap.en, title: '' };
+    }
+
+    const date = new Date(lastTriggered);
+    if (Number.isNaN(date.getTime())) return null;
+
+    let locale = 'en-US';
+    try { locale = this.getLocale() || 'en-US'; } catch (_e) { locale = 'en-US'; }
+    const now = new Date();
+    const sameDay = date.toDateString() === now.toDateString();
+    const sameYear = date.getFullYear() === now.getFullYear();
+
+    // Absolute timestamp as the visible label.
+    let text;
+    try {
+      const options = sameDay
+        ? { hour: '2-digit', minute: '2-digit' }
+        : sameYear
+          ? { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+          : { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+      text = new Intl.DateTimeFormat(locale, options).format(date);
+    } catch (_e) {
+      text = date.toLocaleString();
+    }
+
+    // Relative time in the tooltip.
+    const diffSec = Math.round((now.getTime() - date.getTime()) / 1000);
+    const absSec = Math.abs(diffSec);
+    let title = '';
+    try {
+      const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto', style: 'long' });
+      if (absSec < 45) {
+        title = rtf.format(0, 'second');
+      } else if (absSec < 60 * 60) {
+        title = rtf.format(-Math.round(diffSec / 60), 'minute');
+      } else if (absSec < 60 * 60 * 24) {
+        title = rtf.format(-Math.round(diffSec / 3600), 'hour');
+      } else if (absSec < 60 * 60 * 24 * 30) {
+        title = rtf.format(-Math.round(diffSec / 86400), 'day');
+      } else if (absSec < 60 * 60 * 24 * 365) {
+        title = rtf.format(-Math.round(diffSec / (86400 * 30)), 'month');
+      } else {
+        title = rtf.format(-Math.round(diffSec / (86400 * 365)), 'year');
+      }
+    } catch (_e) {
+      title = '';
+    }
+
+    return { text, title };
   }
 
   renderViewModeButtons() {
@@ -7356,6 +7528,9 @@ class SkylightCalendarCard extends HTMLElement {
 
     dashboardNavButton?.addEventListener('click', () => this.navigateToConfiguredDashboard());
 
+    const headerAutomationButton = this.getRootElementById('header-automation-btn');
+    headerAutomationButton?.addEventListener('click', () => this.triggerConfiguredHeaderAutomation());
+
     prevButton?.addEventListener('click', () => this.navigateToPreviousPeriod());
     nextButton?.addEventListener('click', () => this.navigateToNextPeriod());
 
@@ -7576,6 +7751,25 @@ class SkylightCalendarCard extends HTMLElement {
 
     window.history.pushState(null, '', dashboardPath);
     window.dispatchEvent(new Event('location-changed'));
+  }
+
+  async triggerConfiguredHeaderAutomation() {
+    const entityId = (this._config?.header_automation_entity || '').trim();
+    if (!entityId || !this._hass || typeof this._hass.callService !== 'function') return;
+
+    const button = this.getRootElementById('header-automation-btn');
+    if (button) button.classList.add('is-running');
+
+    try {
+      await this._hass.callService('automation', 'trigger', { entity_id: entityId });
+    } catch (error) {
+      console.error('Skylight Calendar Card: failed to trigger automation', entityId, error);
+    } finally {
+      if (button) {
+        // Small delay so users see visual feedback even if the call returns instantly
+        setTimeout(() => button.classList.remove('is-running'), 200);
+      }
+    }
   }
 
   navigateToNextPeriod() {
@@ -10049,6 +10243,9 @@ class SkylightCalendarCard extends HTMLElement {
       show_dashboard_nav_button: false,
       header_dashboard_path: null,
       header_weather_sensor: '',
+      header_automation_entity: '',
+      header_automation_icon: '',
+      header_automation_label: '',
       color_scheme: 'auto',
       enable_event_management: true
     };
@@ -10184,6 +10381,12 @@ class SkylightCalendarCardEditor extends HTMLElement {
   getCalendarEntities() {
     return Object.keys(this._hass?.states || {})
       .filter((entityId) => entityId.startsWith('calendar.'))
+      .sort();
+  }
+
+  getAutomationEntities() {
+    return Object.keys(this._hass?.states || {})
+      .filter((entityId) => entityId.startsWith('automation.'))
       .sort();
   }
 
@@ -10711,6 +10914,33 @@ class SkylightCalendarCardEditor extends HTMLElement {
           </select>
         </div>
       </div>
+      ` : ''}
+      <div class="field-row">
+        <div class="field field-inline">
+          <label for="header_automation_entity">Header automation button</label>
+          <select id="header_automation_entity" data-field="header_automation_entity">
+            <option value="">No button</option>
+            ${this.getAutomationEntities().map((entityId) => {
+              const friendlyName = this._hass?.states?.[entityId]?.attributes?.friendly_name;
+              const labelText = friendlyName ? `${friendlyName} (${entityId})` : entityId;
+              return `<option value="${this.escapeHtml(entityId)}" ${this._config.header_automation_entity === entityId ? 'selected' : ''}>${this.escapeHtml(labelText)}</option>`;
+            }).join('')}
+          </select>
+        </div>
+      </div>
+      ${this._config.header_automation_entity ? `
+        <div class="field-row">
+          <div class="field field-inline">
+            <label for="header_automation_icon">Button icon</label>
+            <input id="header_automation_icon" data-field="header_automation_icon" type="text" value="${this.escapeHtml(this._config.header_automation_icon || '')}" placeholder="▶ or mdi:flash">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field field-inline">
+            <label for="header_automation_label">Button tooltip</label>
+            <input id="header_automation_label" data-field="header_automation_label" type="text" value="${this.escapeHtml(this._config.header_automation_label || '')}" placeholder="Run automation">
+          </div>
+        </div>
       ` : ''}
       ${this._config.compact_height ? '' : `
         <div class="field">
@@ -11504,7 +11734,7 @@ class SkylightCalendarCardEditor extends HTMLElement {
       checkbox.checked = this.getListFieldValue(listField).includes(checkbox.value);
     });
 
-    this.querySelectorAll('input[data-type="number"], input[data-type="nullable-number"], input[data-type="list"], input[data-field="language"], input[data-field="locale"], input[data-field="header_time_sensor"], input[data-field="header_weather_sensor"], input[data-field="preference_storage_key"], input[data-field="background_image_url"], input[data-field="background_image_size"], input[data-field="background_image_position"], input[data-field="background_image_repeat"]').forEach((input) => {
+    this.querySelectorAll('input[data-type="number"], input[data-type="nullable-number"], input[data-type="list"], input[data-field="language"], input[data-field="locale"], input[data-field="header_time_sensor"], input[data-field="header_weather_sensor"], input[data-field="header_automation_icon"], input[data-field="header_automation_label"], input[data-field="preference_storage_key"], input[data-field="background_image_url"], input[data-field="background_image_size"], input[data-field="background_image_position"], input[data-field="background_image_repeat"]').forEach((input) => {
       if (document.activeElement === input) return;
       const field = input.dataset.field;
       const type = input.dataset.type;
@@ -11680,6 +11910,18 @@ class SkylightCalendarCardEditor extends HTMLElement {
     if (field === 'entity') {
       const selected = Array.from(this.querySelectorAll('input[data-field="entity"]:checked')).map((input) => input.value);
       nextConfig.entities = selected;
+      this._config = nextConfig;
+      this.render();
+      this.dispatchEvent(
+        new CustomEvent('config-changed', {
+          detail: { config: nextConfig },
+          bubbles: true,
+          composed: true
+        })
+      );
+      return;
+    } else if (field === 'header_automation_entity') {
+      nextConfig.header_automation_entity = event.target.value || '';
       this._config = nextConfig;
       this.render();
       this.dispatchEvent(
