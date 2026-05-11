@@ -3240,7 +3240,8 @@ class SkylightCalendarCard extends HTMLElement {
         font-size: 11px;
         opacity: 0.75;
         white-space: nowrap;
-        line-height: 1;
+        line-height: 1.2;
+        text-align: center;
       }
 
       .nav-button:hover {
@@ -5514,11 +5515,26 @@ class SkylightCalendarCard extends HTMLElement {
       const formatted = this.formatHeaderAutomationLastRun(lastTriggered);
       if (!formatted || !formatted.text) return '';
       const titleAttr = formatted.title ? ` title="${this.escapeHtml(formatted.title)}"` : '';
-      return `<span class="header-automation-last-run"${titleAttr}>${this.escapeHtml(formatted.text)}</span>`;
+      const labelText = this.getLastUpdateLabel();
+      return `<span class="header-automation-last-run"${titleAttr}>${this.escapeHtml(labelText)}<br>${this.escapeHtml(formatted.text)}</span>`;
     } catch (error) {
       console.error('Skylight Calendar Card: failed to render last-run label', error);
       return '';
     }
+  }
+
+  getLastUpdateLabel() {
+    let language = 'en';
+    try { language = this.getLanguage() || 'en'; } catch (_e) { language = 'en'; }
+    const labelMap = {
+      en: 'Last update:',
+      nl: 'Laatste update:',
+      de: 'Letzte Aktualisierung:',
+      fr: 'Dernière mise à jour :',
+      es: 'Última actualización:',
+      ca: 'Darrera actualització:'
+    };
+    return labelMap[language] || labelMap.en;
   }
 
   formatHeaderAutomationLastRun(lastTriggered) {
