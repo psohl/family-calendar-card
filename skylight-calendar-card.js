@@ -3419,7 +3419,12 @@ class SkylightCalendarCard extends HTMLElement {
       .calendar-container.has-today-background .week-standard-day-column.today .week-standard-day-header,
       .calendar-container.has-today-background .week-standard-day-column.today .all-day-events,
       .calendar-container.has-today-background .week-standard-day-column.today .day-time-slot,
-      .calendar-container.has-today-background .agenda-day-row.today .agenda-day-label {
+      .calendar-container.has-today-background .agenda-day-row.today .agenda-day-label,
+      .calendar-container.has-today-background .week-day-column.today .week-day-name,
+      .calendar-container.has-today-background .week-day-column.today .week-day-date,
+      .calendar-container.has-today-background .week-standard-day-column.today .week-standard-day-name,
+      .calendar-container.has-today-background .agenda-day-row.today .agenda-day-weekday,
+      .calendar-container.has-today-background .agenda-day-row.today .agenda-day-date {
         background: transparent;
       }
 
