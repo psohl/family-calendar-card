@@ -1040,6 +1040,7 @@ class SkylightCalendarCard extends HTMLElement {
     const normalizedDayStyles = this.normalizeDayStyles(config.day_styles || [], normalizedLocale);
     const normalizedHeaderColor = this.normalizeSingleColor(config.header_color);
     const normalizedHeaderTextColor = this.normalizeSingleColor(config.header_text_color);
+    const normalizedTodayBackgroundColor = this.normalizeSingleColor(config.today_background_color);
     const hasConfiguredHeaderBackgroundOpacity = config.header_background_opacity !== undefined && config.header_background_opacity !== null && config.header_background_opacity !== '';
     const normalizedHeaderBackgroundOpacity = hasConfiguredHeaderBackgroundOpacity
       ? this.normalizeBackgroundOpacity(config.header_background_opacity, 0)
@@ -1126,6 +1127,7 @@ class SkylightCalendarCard extends HTMLElement {
       show_current_time_bar: config.show_current_time_bar || false, // Show a "now" indicator in schedule view
       header_color: normalizedHeaderColor !== undefined ? normalizedHeaderColor : 'var(--primary-color)', // Custom header background color/gradient
       header_text_color: normalizedHeaderTextColor, // Optional custom header text color (auto contrast by default)
+      today_background_color: normalizedTodayBackgroundColor, // Optional background color applied to today's cell/column/row in month, week-compact, week-standard, and agenda views
       header_background_transparent: normalizedHeaderBackgroundOpacity >= 100, // Legacy alias for full header transparency
       header_background_opacity: normalizedHeaderBackgroundOpacity, // Header transparency percentage (0 = opaque, 100 = transparent)
       background_transparent: normalizedBackgroundOpacity >= 100, // Legacy alias for full transparency
@@ -3402,6 +3404,25 @@ class SkylightCalendarCard extends HTMLElement {
         background: #eff6ff;
       }
 
+      .calendar-container.has-today-background .day-cell.today,
+      .calendar-container.has-today-background .week-day-column.today,
+      .calendar-container.has-today-background .week-standard-day-column.today,
+      .calendar-container.has-today-background .agenda-day-row.today {
+        background: var(--today-background-color);
+      }
+
+      .calendar-container.has-today-background .day-cell.today:hover {
+        background: var(--today-background-color);
+      }
+
+      .calendar-container.has-today-background .week-day-column.today .week-day-header,
+      .calendar-container.has-today-background .week-standard-day-column.today .week-standard-day-header,
+      .calendar-container.has-today-background .week-standard-day-column.today .all-day-events,
+      .calendar-container.has-today-background .week-standard-day-column.today .day-time-slot,
+      .calendar-container.has-today-background .agenda-day-row.today .agenda-day-label {
+        background: transparent;
+      }
+
       .day-cell.day-style-has-background,
       .week-day-column.day-style-has-background,
       .week-standard-day-column.day-style-has-background,
@@ -5335,7 +5356,10 @@ class SkylightCalendarCard extends HTMLElement {
         slot: '255, 255, 255'
       };
     const backgroundStyle = `--theme-card-background: ${themeCardBackground}; --calendar-background-opacity: ${backgroundAlpha}; --calendar-background-image-opacity: ${backgroundImageAlpha}; --custom-surface-alpha: ${customSurfaceAlpha}; --custom-surface-calendar-rgb: ${customSurfacePalette.calendar}; --custom-surface-column-rgb: ${customSurfacePalette.column}; --custom-surface-all-day-rgb: ${customSurfacePalette.allDay}; --custom-surface-slot-rgb: ${customSurfacePalette.slot};`;
-    const containerStyle = `${headerStyle} ${backgroundStyle} ${backgroundImageStyle}`.trim();
+    const configuredTodayBackgroundColor = this.normalizeSingleColor(this._config.today_background_color);
+    const hasTodayBackground = typeof configuredTodayBackgroundColor === 'string' && configuredTodayBackgroundColor.trim().length > 0;
+    const todayBackgroundStyle = hasTodayBackground ? ` --today-background-color: ${configuredTodayBackgroundColor};` : '';
+    const containerStyle = `${headerStyle} ${backgroundStyle} ${backgroundImageStyle}${todayBackgroundStyle}`.trim();
 
     this._root.innerHTML = `
       <style>
@@ -5348,7 +5372,7 @@ class SkylightCalendarCard extends HTMLElement {
         </style>
       ` : ''}
 
-      <div class="calendar-container ${this._isDarkMode ? 'dark-mode' : ''} ${hasCustomBackground ? 'custom-background' : ''} ${this._config.hide_year ? 'hide-year' : ''} ${this._config.agenda_compact_events ? 'agenda-compact-events' : ''}" style="${containerStyle}">
+      <div class="calendar-container ${this._isDarkMode ? 'dark-mode' : ''} ${hasCustomBackground ? 'custom-background' : ''} ${this._config.hide_year ? 'hide-year' : ''} ${this._config.agenda_compact_events ? 'agenda-compact-events' : ''}${hasTodayBackground ? ' has-today-background' : ''}" style="${containerStyle}">
         ${this._config.compact_header ? this.renderCompactHeader() : this.renderStandardHeader()}
         <div class="calendar-body">
           ${this.renderCalendarView()}
@@ -10981,6 +11005,13 @@ class SkylightCalendarCardEditor extends HTMLElement {
           <input data-field="header_text_color_text" data-type="header-text-color-text" type="text" value="${this.escapeHtml(this._config.header_text_color || '')}" placeholder="Auto contrast">
         </div>
       </div>
+      <div class="field">
+        <label for="today_background_color">Today background color</label>
+        <div class="field-row">
+          ${this.renderColorInputControl({ id: 'today_background_color', field: 'today_background_color', value: this._config.today_background_color })}
+          <input data-field="today_background_color_text" data-type="today-background-color-text" type="text" value="${this.escapeHtml(this._config.today_background_color || '')}" placeholder="Off (clear to disable)">
+        </div>
+      </div>
       ${this.renderSubSection('Calendar colors', `<div class="map-grid">${this.renderMapRowInputs('colors', { label: 'calendar colors', inputType: 'color' })}</div>`)}
       ${this.renderSubSection('Event font colors', `<div class="map-grid">${this.renderMapRowInputs('event_font_colors', { label: 'event font colors', inputType: 'color' })}</div>`)}
       ${this.renderSubSection('Calendar display names', `<div class="map-grid">${this.renderMapRowInputs('calendar_names', { label: 'calendar names', placeholder: 'Display name' })}</div>`)}
@@ -11797,6 +11828,11 @@ class SkylightCalendarCardEditor extends HTMLElement {
       headerTextColorTextInput.value = this._config.header_text_color || '';
     }
 
+    const todayBackgroundColorTextInput = this.querySelector('input[data-field="today_background_color_text"]');
+    if (todayBackgroundColorTextInput && document.activeElement !== todayBackgroundColorTextInput) {
+      todayBackgroundColorTextInput.value = this._config.today_background_color || '';
+    }
+
     this.querySelectorAll('[data-map-field]').forEach((input) => {
       if (document.activeElement === input) return;
       const mapField = input.dataset.mapField;
@@ -12000,6 +12036,8 @@ class SkylightCalendarCardEditor extends HTMLElement {
       nextConfig.header_color = event.target.value;
     } else if (event.target.dataset.type === 'header-text-color-text') {
       nextConfig.header_text_color = event.target.value;
+    } else if (event.target.dataset.type === 'today-background-color-text') {
+      nextConfig.today_background_color = event.target.value;
     } else if (event.target.dataset.type === 'number') {
       if (event.target.value === '') {
         nextConfig[field] = this.getEditorDefaultValue(field);
